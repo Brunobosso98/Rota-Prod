@@ -7,18 +7,14 @@ $(document).ready(function () {
     var routeId = btn.data('route-id');
     var locationId = btn.data('location-id');
 
-    console.log("Enviando requisição para marcar/desmarcar local como visitado");
-    console.log("Route ID:", routeId);
-    console.log("Location ID:", locationId);
-
     $.ajax({
-      url: '/routes/' + routeId + '/locations/' + locationId + '/toggle_visited',
+      url:
+        '/routes/' + routeId + '/locations/' + locationId + '/toggle_visited',
       type: 'POST',
       headers: {
         'X-CSRFToken': csrfToken,
       },
       success: function (response) {
-        console.log("Resposta recebida:", response);
         if (response.success) {
           // Atualizar estado do botão
           if (response.visited) {
@@ -53,18 +49,18 @@ $(document).ready(function () {
             // Mostrar botão de concluir rota se existir
             $('.complete-route-btn').show();
           }
-          
+
           // Recarregar a página para atualizar o mapa
           // Isso garante que os marcadores no mapa sejam atualizados
-          setTimeout(function() {
+          setTimeout(function () {
             location.reload();
           }, 1000); // Recarrega após 1 segundo
         }
       },
       error: function (xhr, status, error) {
-        console.error("Erro ao atualizar status:", error);
-        console.error("Status:", status);
-        console.error("Resposta:", xhr.responseText);
+        console.error('Erro ao atualizar status:', error);
+        console.error('Status:', status);
+        console.error('Resposta:', xhr.responseText);
         // alert('Ocorreu um erro ao atualizar o status do local.');
       },
     });
