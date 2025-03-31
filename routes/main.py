@@ -1020,7 +1020,6 @@ def optimize_route(route_id):
         
         # Obter token CSRF - aceitar do payload ou do header
         csrf_token = data.get('csrf_token') or request.headers.get('X-CSRFToken')
-        print(f"Token CSRF (optimize) recebido: {csrf_token}")
         
         # Desativar temporariamente a validação de CSRF para solucionar o problema
         # if not csrf_token or not validate_csrf(csrf_token):
@@ -1038,125 +1037,34 @@ def optimize_route(route_id):
         if route.is_completed:
             return jsonify({'success': False, 'message': 'Esta rota já foi concluída e não pode ser otimizada'}), 400
             
-        # Marcar rota como sendo otimizada
-        route.optimization_status = 'optimizing'
-        db.session.commit()
-        
-        try:
-            # Importar funções do appReta
-            from appReta import optimize_route as app_optimize_route, fallback_nearest_neighbor
-            
-            # Obter todos os pontos da rota
-            route_points = RoutePoint.query.filter_by(route_id=route_id).all()
-            if len(route_points) < 3:
-                route.optimization_status = 'not_optimized'
-                db.session.commit()
-                return jsonify({'success': False, 'message': 'São necessários pelo menos 3 pontos para otimizar a rota'}), 400
-            
-            # Separar o ponto de partida (ordem 0) dos outros pontos
-            starting_point = None
-            other_points = []
-            
-            for rp in route_points:
-                if rp.order == 0:
-                    starting_point = rp
-                else:
-                    other_points.append(rp)
-            
-            # Se não tiver ponto de partida definido, usar o primeiro ponto
-            if not starting_point and other_points:
-                starting_point = other_points[0]
-                other_points.remove(starting_point)
-            
-            if not starting_point:
-                route.optimization_status = 'not_optimized'
-                db.session.commit()
-                return jsonify({'success': False, 'message': 'Não há pontos para otimizar'}), 400
-            
-            # Preparar as coordenadas para a otimização
-            start_coordinates = (starting_point.latitude, starting_point.longitude)
-            
-            # Preparar pontos no formato esperado pelo algoritmo de otimização
-            points_for_optimization = []
-            for point in other_points:
-                points_for_optimization.append({
-                    'latitude': point.latitude, 
-                    'longitude': point.longitude,
-                    'id': point.id,
-                    'nome': point.name,
-                    'cidade': point.city or ""
-                })
-            
-            # Adicione estes logs antes de chamar optimize_route
-            print(f"DEBUG - Ponto de partida encontrado no banco:")
-            print(f"  ID: {starting_point.id}")
-            print(f"  Latitude: {starting_point.latitude}")
-            print(f"  Longitude: {starting_point.longitude}")
-            print(f"  Ordem: {starting_point.order}")
-            print(f"  Nome: {starting_point.name}")
-            
-            # Obter o flag 'return_to_start' do request JSON
-            return_to_start_flag = data.get('return_to_start', False)
-            print(f"DEBUG - Flag 'return_to_start' recebido: {return_to_start_flag}")
-
-            # Executar a otimização com a abordagem híbrida
-            try:
-                # A nova versão retorna um dicionário com os pontos e os dados OSRM
-                optimization_result = app_optimize_route(
-                    points_for_optimization,
-                    start_coordinates,
-                    return_to_start=return_to_start_flag # Passar o flag
-                )
-                optimized_points = optimization_result['points']
-                osrm_data = optimization_result.get('osrm_data') # Usar .get para segurança
-
-                # Atualizar a ordem dos pontos baseado no resultado
-                starting_point.order = 0
-                for i, opt_point in enumerate(optimized_points, 1):
-                    point_id = opt_point['id']
-                    point = next((p for p in other_points if p.id == point_id), None)
-                    if point:
-                        point.order = i
-                
-                # Armazenar os dados da rota OSRM no banco
-                if osrm_data and osrm_data['success']:
-                    # Armazenar a geometria codificada em polyline
-                    route.route_geometry = osrm_data['geometry_encoded']
-                    route.route_duration = osrm_data['duration']
-                    route.route_distance = osrm_data['distance']
-                
-                # Marcar a rota como otimizada
-                route.is_optimized = True
-                route.optimized_at = datetime.now(timezone.utc)
-                route.optimization_status = 'optimized'
-                
-                # Salvar todas as alterações
-                db.session.commit()
-                    
-                return jsonify({
-                        'success': True, 
-                        'message': 'Rota otimizada com sucesso',
-                        'has_osrm_data': osrm_data['success'] if osrm_data else False,
-                        'redirect': url_for('main.view_route', route_id=route_id)
-                })
-                
-            except Exception as e:
-                print(f"Erro na otimização: {str(e)}")
-                # Se falhar o OR-Tools, marcar status como falha e tentar fallback
-                route.optimization_status = 'failed'
-                db.session.commit()
-                
-                return jsonify({'success': False, 'message': f'Erro ao otimizar rota: {str(e)}'}), 500
-                    
-        except ImportError as e:
-            print(f"Erro ao importar módulos de otimização: {str(e)}")
-            route.optimization_status = 'failed'
+            # Marcar rota como sendo otimizada
+            route.optimization_status = 'optimizing'
             db.session.commit()
-            return jsonify({'success': False, 'message': f'Módulos de otimização não disponíveis: {str(e)}'}), 500
-            
+
+            # Obter a aplicação Flask atual para usar no contexto da thread
+            app_context = current_app._get_current_object()
+
+            # Iniciar a otimização em uma thread separada
+            thread = Thread(target=process_route_optimization, args=(route.id, app_context))
+            thread.daemon = True  # Permite que a aplicação saia mesmo se a thread estiver rodando
+            thread.start()
+
+            # Retornar imediatamente para o usuário
+            return jsonify({
+                'success': True,
+                'message': 'Otimização da rota iniciada em segundo plano.',
+                'status': 'optimizing'
+            })
+
     except Exception as e:
-        print(f"Erro geral: {str(e)}")
-        return jsonify({'success': False, 'message': f'Erro: {str(e)}'}), 500
+        # Se ocorrer um erro antes de iniciar a thread, reverter o status
+        if route and route.optimization_status == 'optimizing':
+            route.optimization_status = 'failed' # Ou 'not_optimized' dependendo da lógica desejada
+            db.session.commit()
+        print(f"Erro geral na rota /optimize: {str(e)}")
+        import traceback
+        print(traceback.format_exc())
+        return jsonify({'success': False, 'message': f'Erro ao iniciar otimização: {str(e)}'}), 500
 
 @main.route('/route/<int:route_id>/edit', methods=['GET', 'POST'])
 @login_required
