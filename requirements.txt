@@ -1,0 +1,15 @@
+Flask
+Flask-Login
+Flask-WTF
+Flask-Migrate
+Flask-Mail
+python-dotenv
+psycopg2-binary
+pandas
+folium
+gunicorn
+openpyxl
+ortools
+email_validator
+polyline
+waitress

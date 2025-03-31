@@ -1,0 +1,240 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container mt-4">
+  <div class="row mb-4">
+    <div class="col-md-12">
+      <div class="d-flex justify-content-between align-items-center">
+        <h2>Templates de Rotas</h2>
+        <div>
+          <a href="{{ url_for('main.routes') }}" class="btn btn-secondary">
+            <i class="fas fa-arrow-left"></i> Voltar
+          </a>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  {% if templates %}
+  <div class="row">
+    {% for template in templates %}
+    <div class="col-lg-4 col-md-6 mb-4">
+      <div class="card template-card h-100">
+        <div class="card-header bg-primary text-white">
+          <h5 class="card-title mb-0">
+            <i class="fas fa-map-marked-alt me-2"></i>{{ template.name }}
+          </h5>
+        </div>
+        <div class="card-body d-flex flex-column">
+          <div class="template-info mb-3">
+            <div class="info-item mb-2">
+              <i class="fas fa-user text-primary"></i>
+              <span>Criado por: {{ template.creator.username }}</span>
+            </div>
+            <div class="info-item mb-2">
+              <i class="fas fa-calendar-alt text-primary"></i>
+              <span>Data: {{ template.created_at.strftime('%d/%m/%Y') }}</span>
+            </div>
+            <div class="info-item">
+              <i class="fas fa-map-pin text-primary"></i>
+              <span>Total de pontos: {{ template.route_locations|length }}</span>
+            </div>
+          </div>
+
+          <div class="template-actions mt-auto">
+            <button class="btn btn-primary w-100 mb-2 create-template-btn" data-template-id="{{ template.id }}">
+              <i class="fas fa-plus-circle me-2"></i>Criar Nova Rota
+            </button>
+            <div class="action-buttons">
+              <a href="{{ url_for('main.view_route', route_id=template.id) }}" class="btn btn-outline-info flex-grow-1">
+                <i class="fas fa-eye"></i>
+                <span class="d-none d-sm-inline ms-1">Visualizar</span>
+              </a>
+              {% if current_user.is_admin() or template.creator_id == current_user.id %}
+              <button class="btn btn-outline-danger flex-grow-1" onclick="deleteTemplate({{ template.id }})">
+                <i class="fas fa-trash"></i>
+                <span class="d-none d-sm-inline ms-1">Excluir</span>
+              </button>
+              {% endif %}
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+  {% else %}
+  <div class="alert alert-info">
+    <i class="fas fa-info-circle me-2"></i>Nenhum template encontrado.
+  </div>
+  {% endif %}
+
+  <!-- Modal para criar nova rota a partir do template -->
+  <div class="modal fade" id="newRouteNameModal" tabindex="-1" aria-labelledby="newRouteNameModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title" id="newRouteNameModalLabel">Nova Rota a partir do Template</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
+        </div>
+        <div class="modal-body">
+          <!-- Nome da nova rota -->
+          <div class="form-group mb-4">
+            <label for="newRouteName" class="form-label">Nome da Nova Rota</label>
+            <input type="text" class="form-control" id="newRouteName" required>
+          </div>
+
+          <!-- Lista de pontos do template -->
+          <div class="card mb-4">
+            <div class="card-header d-flex justify-content-between align-items-center">
+              <h6 class="mb-0">Pontos da Rota</h6>
+              <button type="button" class="btn btn-success btn-sm" id="addLocationBtn">
+                <i class="fas fa-plus"></i> Adicionar Local
+              </button>
+            </div>
+            <div class="card-body">
+              <div class="table-responsive">
+                <table class="table table-hover" id="routePointsTable">
+                  <thead>
+                    <tr>
+                      <th>Ordem</th>
+                      <th>Nome</th>
+                      <th>Cidade</th>
+                      <th>Estado</th>
+                      <th>Ações</th>
+                    </tr>
+                  </thead>
+                  <tbody id="routePointsList">
+                    <!-- Os pontos serão renderizados aqui via JavaScript -->
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+
+          <!-- Modal interno para adicionar novo local -->
+          <div class="modal fade" id="addLocationModal" tabindex="-1">
+            <div class="modal-dialog">
+              <div class="modal-content">
+                <div class="modal-header">
+                  <h5 class="modal-title">Adicionar Local</h5>
+                  <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                  <div class="form-group">
+                    <label for="locationSelect" class="form-label">Selecione o Local</label>
+                    <select class="form-select" id="locationSelect">
+                      <!-- Opções serão carregadas via JavaScript -->
+                    </select>
+                  </div>
+                </div>
+                <div class="modal-footer">
+                  <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                  <button type="button" class="btn btn-primary" id="confirmAddLocation">Adicionar</button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+          <button type="button" class="btn btn-primary" id="confirmCreateRoute">Criar Rota</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+{% endblock %}
+
+{% block extra_css %}
+<style>
+  .template-card {
+    transition: all 0.3s ease;
+    border: none;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  }
+
+  .template-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.15);
+  }
+
+  .card-header {
+    border-bottom: none;
+    padding: 1rem;
+  }
+
+  .template-info {
+    color: #6c757d;
+  }
+
+  .info-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 5px 0;
+  }
+
+  .info-item i {
+    width: 20px;
+    text-align: center;
+    opacity: 0.8;
+  }
+
+  .template-actions {
+    margin-top: 1rem;
+  }
+
+  .action-buttons {
+    display: flex;
+    gap: 8px;
+  }
+
+  .action-buttons .btn {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 8px;
+  }
+
+  .btn {
+    border-radius: 8px;
+    transition: all 0.2s ease;
+  }
+
+  .btn-primary {
+    background-color: #0d6efd;
+    border-color: #0d6efd;
+  }
+
+  .btn-primary:hover {
+    background-color: #0b5ed7;
+    border-color: #0a58ca;
+    transform: translateY(-2px);
+  }
+
+  .btn-outline-info:hover,
+  .btn-outline-danger:hover {
+    transform: translateY(-2px);
+  }
+
+  @media (max-width: 576px) {
+    .action-buttons .btn {
+      padding: 8px 12px;
+    }
+
+    .info-item {
+      font-size: 0.9rem;
+    }
+  }
+</style>
+{% endblock %}
+
+{% block scripts %}
+<!-- Bootstrap Bundle com Popper -->
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+<!-- Seu script -->
+<script src="{{ url_for('static', filename='js/template_interactions.js') }}"></script>
+{% endblock %}

@@ -1,0 +1,292 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard{% endblock %}
+
+{% block extra_css %}
+<style>
+    .stat-card {
+        transition: all 0.3s ease;
+        border: none;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        border-radius: 15px;
+        overflow: hidden;
+    }
+
+    .stat-card:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+    }
+
+    .stat-icon {
+        font-size: 2rem;
+        opacity: 0.8;
+    }
+
+    .quick-action-card {
+        transition: all 0.3s ease;
+        border: none;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        border-radius: 15px;
+        cursor: pointer;
+    }
+
+    .quick-action-card:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+    }
+
+    .recent-routes {
+        max-height: 400px;
+        overflow-y: auto;
+    }
+
+    .route-item {
+        padding: 1rem;
+        border-bottom: 1px solid #eee;
+    }
+
+    .route-item:last-child {
+        border-bottom: none;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="row mb-4">
+        <div class="col-md-12">
+            <div class="bg-white p-4 rounded shadow-sm">
+                <h2 class="mb-0">Bem-vindo, {{ current_user.username }}!</h2>
+                <p class="text-muted">
+                    {% if current_user.is_admin() %}
+                    Administrador
+                    {% elif current_user.is_manager() %}
+                    Gerente de Vendas
+                    {% else %}
+                    Vendedor
+                    {% endif %}
+                    da empresa <strong>{{ company.name }}</strong>
+                </p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Status Cards -->
+    <div class="row mb-4">
+        <div class="mb-3 mb-md-0 col-md-3">
+            <div class="card bg-primary text-white h-100">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <h6 class="text-uppercase">Rotas Ativas</h6>
+                            <h2 class="mb-0">{{ active_routes }}</h2>
+                        </div>
+                        <i class="fas fa-route fa-3x opacity-50"></i>
+                    </div>
+                </div>
+                <div class="card-footer bg-primary-dark py-2">
+                    <a href="{{ url_for('main.routes') }}" class="text-white text-decoration-none small">
+                        Ver detalhes <i class="fas fa-arrow-right ms-1"></i>
+                    </a>
+                </div>
+            </div>
+        </div>
+
+        <div class="mb-3 mb-md-0 col-md-3">
+            <div class="card bg-success text-white h-100">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <h6 class="text-uppercase">Rotas Concluídas</h6>
+                            <h2 class="mb-0">{{ completed_routes }}</h2>
+                        </div>
+                        <i class="fas fa-check-circle fa-3x opacity-50"></i>
+                    </div>
+                </div>
+                <div class="card-footer bg-success-dark py-2">
+                    <a href="{{ url_for('main.completed_routes') }}" class="text-white text-decoration-none small">
+                        Ver detalhes <i class="fas fa-arrow-right ms-1"></i>
+                    </a>
+                </div>
+            </div>
+        </div>
+
+        <div class="mb-3 mb-md-0 col-md-3">
+            <div class="card bg-info text-white h-100">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <h6 class="text-uppercase">Locais Cadastrados</h6>
+                            <h2 class="mb-0">{{ total_locations }}</h2>
+                        </div>
+                        <i class="fas fa-map-marker-alt fa-3x opacity-50"></i>
+                    </div>
+                </div>
+                <div class="card-footer bg-info-dark py-2">
+                    <a href="{{ url_for('main.locations') }}" class="text-white text-decoration-none small">
+                        Ver detalhes <i class="fas fa-arrow-right ms-1"></i>
+                    </a>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-3">
+            <div class="card bg-warning text-white h-100">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <h6 class="text-uppercase">Locais Visitados</h6>
+                            <h2 class="mb-0">{{ visited_points }}</h2>
+                        </div>
+                        <i class="fas fa-check fa-3x opacity-50"></i>
+                    </div>
+                </div>
+                <div class="card-footer bg-warning-dark py-2">
+                    <span class="text-white text-decoration-none small">
+                        Total de locais visitados
+                    </span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Admin/Manager Stats -->
+    {% if current_user.is_admin() or current_user.is_manager() %}
+    <div class="row mb-4">
+        <div class="mb-3 mb-md-0 col-md-6">
+            <div class="card shadow-sm h-100">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="mb-0">Gerentes de Vendas</h5>
+                </div>
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <h1 class="display-4">{{ total_managers }}</h1>
+                            <p class="text-muted">Gerentes cadastrados</p>
+                        </div>
+                        <i class="fas fa-user-tie fa-5x text-muted opacity-25"></i>
+                    </div>
+
+                    {% if current_user.is_admin() %}
+                    <a href="{{ url_for('main.manage_users') }}" class="btn btn-outline-primary mt-3">
+                        <i class="fas fa-users"></i> Gerenciar Usuários
+                    </a>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-6">
+            <div class="card shadow-sm h-100">
+                <div class="card-header bg-success text-white">
+                    <h5 class="mb-0">Vendedores</h5>
+                </div>
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <h1 class="display-4">{{ total_sellers }}</h1>
+                            <p class="text-muted">Vendedores cadastrados</p>
+                        </div>
+                        <i class="fas fa-users fa-5x text-muted opacity-25"></i>
+                    </div>
+
+                    {% if current_user.is_admin() or current_user.is_manager() %}
+                    <a href="{{ url_for('main.manage_users') }}" class="btn btn-outline-success mt-3">
+                        <i class="fas fa-users"></i> Gerenciar Vendedores
+                    </a>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Recent Routes -->
+    <div class="row">
+        <div class="col-md-12">
+            <div class="card shadow-sm">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="mb-0">Rotas Recentes</h5>
+                </div>
+                <div class="card-body">
+                    {% if recent_routes %}
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <thead>
+                                <tr>
+                                    <th>Nome</th>
+                                    <th>Criado por</th>
+                                    <th>Data Criação</th>
+                                    <th>Status</th>
+                                    <th>Progresso</th>
+                                    <th>Ações</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for route in recent_routes %}
+                                {% set visited = route.points|selectattr('is_visited', 'eq', true)|list|length %}
+                                {% set total = route.points|length %}
+                                {% set percent = (visited / total * 100) if total > 0 else 0 %}
+
+                                <tr>
+                                    <td>{{ route.name }}</td>
+                                    <td>{{ route.creator.username }}</td>
+                                    <td>{{ route.created_at.strftime('%d/%m/%Y') }}</td>
+                                    <td>
+                                        {% if route.is_completed %}
+                                        <span class="badge bg-success">Concluída</span>
+                                        {% else %}
+                                        <span class="badge bg-warning">Em andamento</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        <div class="progress">
+                                            <div class="progress-bar bg-success" role="progressbar" style="width: {{ percent }}%">
+                                                {{ visited }}/{{ total }}
+                                            </div>
+                                        </div>
+                                    </td>
+                                    <td>
+                                        <a href="{{ url_for('main.view_route', route_id=route.id) }}" class="btn btn-sm btn-info">
+                                            <i class="fas fa-eye"></i> Ver
+                                        </a>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    {% else %}
+                    <div class="alert alert-info">
+                        Nenhuma rota encontrada.
+                        {% if current_user.is_admin() or current_user.is_manager() %}
+                        <a href="{{ url_for('main.create_route') }}">Criar uma nova rota</a>.
+                        {% endif %}
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    function optimizeRoute(routeId) {
+        if (confirm('Deseja otimizar esta rota?')) {
+            fetch(`/routes/${routeId}/optimize`, {
+                method: 'POST',
+            })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        location.reload();
+                    } else {
+                        alert('Erro ao otimizar rota');
+                    }
+                });
+        }
+    }
+</script>
+{% endblock %}

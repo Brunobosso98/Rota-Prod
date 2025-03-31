@@ -1,0 +1,194 @@
+{% extends "base.html" %}
+
+{% block title %}Início - Otimizador de Rotas{% endblock %}
+
+{% block content %}
+<!-- Hero Section -->
+<div class="container-fluid py-5 bg-primary text-white">
+  <div class="container">
+    <div class="row align-items-center">
+      <div class="col-lg-6">
+        <h1 class="display-4 fw-bold mb-4">
+          <i class="fas fa-route me-3"></i>
+          Otimizador de Rotas
+        </h1>
+        <p class="lead mb-4">
+          Transforme sua logística com nossa solução avançada de otimização de rotas.
+          Aumente a produtividade, reduza custos e gerencie sua equipe em tempo real.
+        </p>
+        {% if not current_user.is_authenticated %}
+        <div class="d-grid gap-3 d-sm-flex">
+          <a href="{{ url_for('auth.register') }}" class="btn btn-light btn-lg px-4">
+            <i class="fas fa-user-plus me-2"></i>Começar Agora
+          </a>
+          <a href="{{ url_for('auth.login') }}" class="btn btn-outline-light btn-lg px-4">
+            <i class="fas fa-sign-in-alt me-2"></i>Entrar
+          </a>
+        </div>
+        {% else %}
+        <div class="d-grid gap-3 d-sm-flex">
+          <a href="{{ url_for('main.dashboard') }}" class="btn btn-light btn-lg px-4">
+            <i class="fas fa-tachometer-alt me-2"></i>Ir para Dashboard
+          </a>
+        </div>
+        {% endif %}
+      </div>
+      <!-- Imagem removida temporariamente pois o arquivo não foi encontrado -->
+
+      <div class="col-lg-6 d-none d-lg-block text-center">
+        <img src="{{ url_for('static', filename='img/hero.svg') }}" alt="Ilustração de Rotas" class="img-fluid" style="max-height: 400px;">
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<!-- Features Section -->
+<div class="container py-5">
+  <h2 class="text-center mb-5">Recursos Principais</h2>
+  <div class="row g-4">
+    <div class="col-md-4">
+      <div class="card h-100 border-0 shadow-sm">
+        <div class="card-body text-center">
+          <i class="fas fa-map-marked-alt fa-3x text-primary mb-3"></i>
+          <h3 class="card-title h5">Otimização Inteligente</h3>
+          <p class="card-text">Algoritmos avançados baseados em OR-Tools e OSRM para calcular a melhor sequência de visitas, considerando múltiplas variáveis.</p>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-4">
+      <div class="card h-100 border-0 shadow-sm">
+        <div class="card-body text-center">
+          <i class="fas fa-chart-line fa-3x text-primary mb-3"></i>
+          <h3 class="card-title h5">Monitoramento em Tempo Real</h3>
+          <p class="card-text">Acompanhe sua equipe em tempo real, visualize estatísticas e receba alertas importantes sobre o progresso das rotas.</p>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-4">
+      <div class="card h-100 border-0 shadow-sm">
+        <div class="card-body text-center">
+          <i class="fas fa-mobile-alt fa-3x text-primary mb-3"></i>
+          <h3 class="card-title h5">Interface Responsiva</h3>
+          <p class="card-text">Acesse o sistema de qualquer dispositivo, com interface adaptativa e experiência consistente em desktop e mobile.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- How It Works -->
+<div class="container-fluid py-5 bg-light">
+  <div class="container">
+    <h2 class="text-center mb-5">Como Funciona</h2>
+    <div class="row g-4">
+      <div class="col-md-3">
+        <div class="text-center">
+          <div class="circle-step mb-3">1</div>
+          <h4>Cadastre Pontos</h4>
+          <p>Adicione seus pontos de visita com endereços ou coordenadas GPS</p>
+        </div>
+      </div>
+      <div class="col-md-3">
+        <div class="text-center">
+          <div class="circle-step mb-3">2</div>
+          <h4>Crie Rotas</h4>
+          <p>Organize seus pontos em rotas e defina parâmetros de otimização</p>
+        </div>
+      </div>
+      <div class="col-md-3">
+        <div class="text-center">
+          <div class="circle-step mb-3">3</div>
+          <h4>Otimize</h4>
+          <p>Nosso algoritmo calcula a melhor sequência de visitas</p>
+        </div>
+      </div>
+      <div class="col-md-3">
+        <div class="text-center">
+          <div class="circle-step mb-3">4</div>
+          <h4>Acompanhe</h4>
+          <p>Monitore o progresso e colete dados em tempo real</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- User Roles -->
+<div class="container py-5">
+  <h2 class="text-center mb-5">Solução para Cada Perfil</h2>
+  <div class="row g-4">
+    <div class="col-md-4">
+      <div class="card h-100 border-0 shadow-sm">
+        <div class="card-body">
+          <h3 class="card-title">
+            <i class="fas fa-user-tie text-primary me-2"></i>Administradores
+          </h3>
+          <ul class="list-unstyled">
+            <li><i class="fas fa-check text-success me-2"></i>Gestão completa do sistema</li>
+            <li><i class="fas fa-check text-success me-2"></i>Relatórios avançados</li>
+            <li><i class="fas fa-check text-success me-2"></i>Configurações personalizadas</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-4">
+      <div class="card h-100 border-0 shadow-sm">
+        <div class="card-body">
+          <h3 class="card-title">
+            <i class="fas fa-user-cog text-primary me-2"></i>Gerentes
+          </h3>
+          <ul class="list-unstyled">
+            <li><i class="fas fa-check text-success me-2"></i>Criação de rotas</li>
+            <li><i class="fas fa-check text-success me-2"></i>Gestão de equipe</li>
+            <li><i class="fas fa-check text-success me-2"></i>Análise de performance</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-4">
+      <div class="card h-100 border-0 shadow-sm">
+        <div class="card-body">
+          <h3 class="card-title">
+            <i class="fas fa-user text-primary me-2"></i>Vendedores
+          </h3>
+          <ul class="list-unstyled">
+            <li><i class="fas fa-check text-success me-2"></i>Visualização de rotas</li>
+            <li><i class="fas fa-check text-success me-2"></i>Check-in/Check-out</li>
+            <li><i class="fas fa-check text-success me-2"></i>Estatísticas pessoais</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Call to Action -->
+<div class="container-fluid py-5 bg-primary text-white">
+  <div class="container text-center">
+    <h2 class="mb-4">Pronto para Otimizar suas Rotas?</h2>
+    <p class="lead mb-4">Comece agora e transforme a eficiência da sua equipe de vendas</p>
+    {% if not current_user.is_authenticated %}
+    <a href="{{ url_for('auth.register') }}" class="btn btn-light btn-lg px-4">
+      <i class="fas fa-rocket me-2"></i>Começar Gratuitamente
+    </a>
+    {% endif %}
+  </div>
+</div>
+
+<style>
+  .circle-step {
+    width: 60px;
+    height: 60px;
+    background-color: var(--primary-color);
+    color: white;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 24px;
+    font-weight: bold;
+    margin: 0 auto;
+  }
+</style>
+{% endblock %}

@@ -1,0 +1,529 @@
+{% extends "base.html" %}
+
+{% block title %}Rotas Ativas{% endblock %}
+
+{% block extra_css %}
+<style>
+  .route-card {
+    transition: all 0.3s ease;
+    border: none;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  }
+
+  .route-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+  }
+
+  .filter-section {
+    background: white;
+    padding: 1.5rem;
+    border-radius: 10px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+    margin-bottom: 2rem;
+  }
+
+  .location-list {
+    max-height: 400px;
+    overflow-y: auto;
+  }
+
+  .location-item {
+    padding: 0.75rem;
+    border-bottom: 1px solid #eee;
+  }
+
+  .location-item:last-child {
+    border-bottom: none;
+  }
+
+  .route-form {
+    background: white;
+    padding: 2rem;
+    border-radius: 15px;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  }
+
+  .starting-point-section {
+    background: #f8f9fa;
+    padding: 1.5rem;
+    border-radius: 10px;
+    margin-bottom: 2rem;
+  }
+
+  /* Ensure modal dialog is above backdrop on mobile */
+  @media (max-width: 767.98px) {
+    .modal-dialog {
+      z-index: 1060;
+    }
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<div id="route-data"></div>
+
+<div class="container mt-4">
+  <div class="row mb-4">
+    <div class="col-md-12">
+      <div class="d-flex justify-content-between align-items-center flex-column flex-md-row">
+        <h2 class="mb-3 mb-md-0">Rotas Ativas</h2>
+        <div class="d-flex flex-column flex-md-row gap-2">
+          <a href="{{ url_for('main.completed_routes') }}" class="btn btn-success">
+            <i class="fas fa-check-circle"></i> Rotas Concluídas
+          </a>
+          <!-- Modificar o botão de templates para aparecer apenas para admin/gerente -->
+          {% if current_user.is_admin() or current_user.is_manager() %}
+          <a href="{{ url_for('main.route_templates') }}" class="btn btn-info">
+            <i class="fas fa-save"></i> Templates de Rotas
+          </a>
+          {% endif %}
+          {% if current_user.is_admin() or current_user.is_manager() %}
+          <a href="{{ url_for('main.create_route') }}" class="btn btn-primary">
+            <i class="fas fa-plus-circle"></i> Nova Rota
+          </a>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+  </div>
+
+  {% if routes_by_creator %}
+  {% for creator, routes in routes_by_creator.items() %}
+  <div class="card shadow mb-4">
+    <div class="card-header bg-primary text-white">
+      <h4 class="mb-0">Rotas criadas por: {{ creator }}</h4>
+    </div>
+    <div class="card-body">
+      <div class="table-responsive">
+        <table class="table table-hover">
+          <thead>
+            <tr>
+              <th>Nome</th>
+              <th class="d-none d-md-table-cell">{# Hide on mobile #} Data de Criação</th>
+              <th class="d-none d-md-table-cell">{# Hide on mobile #} Última Atualização</th>
+              <th>Progresso</th>
+              <th class="d-none d-md-table-cell">Otimização</th>
+              <th>Ações</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for route in routes %}
+            <tr data-route-id="{{ route.id }}">
+              <td>{{ route.name }}</td>
+              <td class="d-none d-md-table-cell">{# Hide on mobile #} {{ route.created_at.strftime('%d/%m/%Y') }}</td>
+              <td class="d-none d-md-table-cell">{# Hide on mobile #} {{ route.last_updated.strftime('%d/%m/%Y %H:%M') }}</td>
+              <td>
+                {% set visited = route.points|selectattr('is_visited', 'eq', true)|list|length %}
+                {% set total = route.points|length %}
+                {% set percent = (visited / total * 100) if total > 0 else 0 %}
+                <div class="progress">
+                  <div class="progress-bar bg-success" role="progressbar" style="width: {{ percent }}%">
+                    {{ visited }}/{{ total }}
+                  </div>
+                </div>
+              </td>
+              <td class="d-none d-md-table-cell">
+                <span class="badge 
+                    {% if route.optimization_status == 'optimized' %}bg-success
+                    {% elif route.optimization_status == 'optimizing' %}bg-warning
+                    {% else %}bg-secondary{% endif %}">
+                  {% if route.optimization_status == 'optimized' %}Otimizada
+                  {% elif route.optimization_status == 'optimizing' %}Em otimização...
+                  {% else %}Não otimizada{% endif %}
+                </span>
+              </td>
+              <td>
+                {# Desktop Actions - Hidden on mobile #}
+                <div class="btn-group btn-group-sm d-none d-md-inline-flex" role="group">
+                  <a href="{{ url_for('main.view_route', route_id=route.id) }}" class="btn btn-info" title="Visualizar">
+                    <i class="fas fa-eye"></i>
+                  </a>
+                  <a href="{{ url_for('main.edit_route', route_id=route.id) }}" class="btn btn-primary" title="Editar">
+                    <i class="fas fa-edit"></i>
+                  </a>
+                  {% if not route.is_completed and route.optimization_status != 'optimizing' %}
+                  <button type="button" class="btn btn-outline-info" title="Otimizar Rota" onclick="optimizeRoute({{ route.id }})">
+                    <i class="fas fa-route"></i>
+                  </button>
+                  {% endif %}
+                  {% if current_user.is_admin() or (current_user.is_manager() and route.creator_id == current_user.id) %}
+                  <form action="{{ url_for('main.delete_route', route_id=route.id) }}" method="POST" style="display: inline;" onsubmit="return confirm('Tem certeza que deseja excluir esta rota?');">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <button type="submit" class="btn btn-danger" title="Excluir">
+                      <i class="fas fa-trash"></i>
+                    </button>
+                  </form>
+                  {% endif %}
+                  <button type="button" class="btn btn-success" title="Salvar como Template" onclick="saveAsTemplate({{ route.id }})">
+                    <i class="fas fa-save"></i>
+                  </button>
+                </div>
+                {# Mobile Actions Trigger - Visible only on mobile #}
+                <button type="button" class="btn btn-sm btn-outline-primary d-md-none" data-bs-toggle="modal" data-bs-target="#actionsModal{{ route.id }}">
+                  Ações
+                </button>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+  {% endfor %}
+
+  {# Modals for Mobile Actions - Moved outside the loop/table #}
+  {% for creator, routes in routes_by_creator.items() %}
+  {% for route in routes %}
+  <div class="modal fade" id="actionsModal{{ route.id }}" tabindex="-1" aria-labelledby="actionsModalLabel{{ route.id }}" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title" id="actionsModalLabel{{ route.id }}">Ações para: {{ route.name }}</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body">
+          <div class="d-grid gap-2"> {# Use grid for stacked buttons #}
+            <a href="{{ url_for('main.view_route', route_id=route.id) }}" class="btn btn-info w-100">
+              <i class="fas fa-eye me-2"></i>Visualizar
+            </a>
+            <a href="{{ url_for('main.edit_route', route_id=route.id) }}" class="btn btn-primary w-100">
+              <i class="fas fa-edit me-2"></i>Editar
+            </a>
+            {% if not route.is_completed and route.optimization_status != 'optimizing' %}
+            <button type="button" class="btn btn-outline-info w-100" onclick="optimizeRoute({{ route.id }}); document.getElementById('actionsModal{{ route.id }}').querySelector('.btn-close').click();">
+              <i class="fas fa-route me-2"></i>Otimizar Rota
+            </button>
+            {% endif %}
+            {% if current_user.is_admin() or (current_user.is_manager() and route.creator_id == current_user.id) %}
+            <form action="{{ url_for('main.delete_route', route_id=route.id) }}" method="POST" onsubmit="return confirm('Tem certeza que deseja excluir esta rota?');">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+              <button type="submit" class="btn btn-danger w-100">
+                <i class="fas fa-trash me-2"></i>Excluir
+              </button>
+            </form>
+            {% endif %}
+            <button type="button" class="btn btn-success w-100" onclick="saveAsTemplate({{ route.id }}); document.getElementById('actionsModal{{ route.id }}').querySelector('.btn-close').click();">
+              <i class="fas fa-save me-2"></i>Salvar como Template
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  {% endfor %}
+  {% endfor %}
+  {% else %}
+  <div class="alert alert-info">
+    Nenhuma rota ativa encontrada.
+    {% if current_user.is_admin() or current_user.is_manager() %}
+    <a href="{{ url_for('main.create_route') }}">Criar uma nova rota</a>.
+    {% endif %}
+  </div>
+  {% endif %}
+</div>
+
+<!-- New Route Modal -->
+<div class="modal fade" id="newRouteModal" tabindex="-1">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">Criar Nova Rota</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <form action="{{ url_for('main.create_route') }}" method="post" class="route-form">
+          <div class="mb-3">
+            <label for="routeName" class="form-label">Nome da Rota</label>
+            <input type="text" class="form-control" id="routeName" name="name" required>
+          </div>
+          <div class="mb-3">
+            <label for="routeDescription" class="form-label">Descrição</label>
+            <textarea class="form-control" id="routeDescription" name="description" rows="3"></textarea>
+          </div>
+
+          <!-- Starting Point Section -->
+          <div class="starting-point-section">
+            <h6 class="mb-3">Ponto de Partida</h6>
+            <div class="form-check mb-3">
+              <input class="form-check-input" type="radio" name="starting_point_type" id="existingLocation" value="existing" checked>
+              <label class="form-check-label" for="existingLocation">
+                Selecionar local existente
+              </label>
+            </div>
+            <div id="existingLocationFields">
+              <div class="mb-3">
+                <label for="startingLocation" class="form-label">Local de Partida</label>
+                <select class="form-select" id="startingLocation" name="starting_location_id">
+                  <option value="">Selecione um local</option>
+                  {% for location in locations %}
+                  <option value="{{ location.id }}">{{ location.name }} - {{ location.city }}, {{ location.state }}</option>
+                  {% endfor %}
+                </select>
+              </div>
+            </div>
+            <div class="form-check mb-3">
+              <input class="form-check-input" type="radio" name="starting_point_type" id="newLocation" value="new">
+              <label class="form-check-label" for="newLocation">
+                Informar novo local
+              </label>
+            </div>
+            <div id="newLocationFields" style="display: none;">
+              <div class="mb-3">
+                <label for="newLocationName" class="form-label">Nome do Local</label>
+                <input type="text" class="form-control" id="newLocationName" name="new_location_name">
+              </div>
+              <div class="mb-3">
+                <label for="newLocationCity" class="form-label">Cidade</label>
+                <input type="text" class="form-control" id="newLocationCity" name="new_location_city">
+              </div>
+              <div class="mb-3">
+                <label for="newLocationState" class="form-label">Estado</label>
+                <select class="form-select" id="newLocationState" name="new_location_state">
+                  <option value="">Selecione um estado</option>
+                  {% for state in states %}
+                  <option value="{{ state }}">{{ state }}</option>
+                  {% endfor %}
+                </select>
+              </div>
+              <div class="mb-3">
+                <label for="newLocationLatitude" class="form-label">Latitude</label>
+                <input type="number" step="any" class="form-control" id="newLocationLatitude" name="new_location_latitude">
+              </div>
+              <div class="mb-3">
+                <label for="newLocationLongitude" class="form-label">Longitude</label>
+                <input type="number" step="any" class="form-control" id="newLocationLongitude" name="new_location_longitude">
+              </div>
+            </div>
+          </div>
+
+          <!-- Filters Section -->
+          <div class="filter-section">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+              <h6 class="mb-0">Filtrar Locais</h6>
+              <button type="button" class="btn btn-sm btn-outline-primary" onclick="toggleAllLocations(true)">
+                <i class="fas fa-check-double me-1"></i>Selecionar Todas
+              </button>
+            </div>
+            <div class="row g-3">
+              <div class="col-md-6">
+                <label for="stateFilter" class="form-label">Estado</label>
+                <select class="form-select" id="stateFilter" onchange="filterLocations()">
+                  <option value="">Todos os estados</option>
+                  {% for state in states %}
+                  <option value="{{ state }}">{{ state }}</option>
+                  {% endfor %}
+                </select>
+              </div>
+              <div class="col-md-6">
+                <label for="cityFilter" class="form-label">Cidade</label>
+                <select class="form-select" id="cityFilter" onchange="filterLocations()">
+                  <option value="">Todas as cidades</option>
+                  {% for city in cities %}
+                  <option value="{{ city }}">{{ city }}</option>
+                  {% endfor %}
+                </select>
+              </div>
+            </div>
+          </div>
+
+          <!-- Locations List -->
+          <div class="mb-3">
+            <label class="form-label">Selecionar Locais</label>
+            <div class="location-list">
+              {% for location in locations %}
+              <div class="location-item">
+                <div class="form-check">
+                  <input class="form-check-input location-checkbox" type="checkbox" name="locations[]" value="{{ location.id }}" id="location{{ location.id }}">
+                  <label class="form-check-label" for="location{{ location.id }}">
+                    {{ location.name }} - {{ location.city }}, {{ location.state }}
+                  </label>
+                </div>
+              </div>
+              {% endfor %}
+            </div>
+          </div>
+
+          <button type="submit" class="btn btn-primary w-100">
+            <i class="fas fa-save me-2"></i>Criar Rota
+          </button>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/route_interactions.js') }}"></script>
+<script>
+  function filterLocations() {
+    const state = document.getElementById('stateFilter').value;
+    const city = document.getElementById('cityFilter').value;
+    const locationItems = document.querySelectorAll('.location-item');
+
+    locationItems.forEach(item => {
+      const locationText = item.querySelector('.form-check-label').textContent;
+      const matchesState = !state || locationText.includes(state);
+      const matchesCity = !city || locationText.includes(city);
+
+      item.style.display = matchesState && matchesCity ? 'block' : 'none';
+    });
+  }
+
+  function toggleAllLocations(checked) {
+    const visibleCheckboxes = document.querySelectorAll('.location-item:not([style*="display: none"]) .location-checkbox');
+    visibleCheckboxes.forEach(checkbox => {
+      checkbox.checked = checked;
+    });
+  }
+
+  function optimizeRoute(routeId) {
+    // Encontrar a célula de status para esta rota
+    const statusCell = document.querySelector(`tr[data-route-id="${routeId}"] td:nth-child(5)`);
+    if (!statusCell) return;
+
+    // Guardar conteúdo original da célula
+    const originalContent = statusCell.innerHTML;
+
+    // Atualizar status para "em otimização"
+    statusCell.innerHTML = `
+        <span class="badge bg-warning">Em otimização...</span>
+        <small class="d-block text-muted">Iniciando...</small>
+    `;
+
+    // Obter token CSRF
+    const csrf_token = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
+
+    // Fazer requisição para iniciar otimização
+    fetch(`/routes/${routeId}/optimize`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Requested-With': 'XMLHttpRequest',
+        ...(csrf_token && { 'X-CSRFToken': csrf_token })
+      },
+      body: JSON.stringify({ csrf_token })
+    })
+      .then(response => response.json())
+      .then(data => {
+        if (data.success) {
+          // Iniciar polling do status
+          pollOptimizationStatus(routeId, statusCell);
+        } else {
+          statusCell.innerHTML = originalContent;
+          alert(data.message || 'Erro ao iniciar otimização');
+        }
+      })
+      .catch(error => {
+        console.error('Erro:', error);
+        statusCell.innerHTML = originalContent;
+        alert('Erro ao processar a solicitação');
+      });
+  }
+
+  function pollOptimizationStatus(routeId, statusCell) {
+    const checkStatus = () => {
+      fetch(`/route/${routeId}/optimization-status`)
+        .then(response => response.json())
+        .then(data => {
+          if (data.success) {
+            switch (data.status) {
+              case 'optimized':
+                statusCell.innerHTML = `
+                            <span class="badge bg-success">Otimizada</span>
+                            <small class="d-block text-muted">${data.optimized_at || ''}</small>
+                        `;
+                return true; // Parar polling
+              case 'failed':
+                statusCell.innerHTML = `
+                            <span class="badge bg-danger">Falha na otimização</span>
+                        `;
+                return true; // Parar polling
+              case 'optimizing':
+                statusCell.innerHTML = `
+                            <span class="badge bg-warning">Em otimização...</span>
+                            <small class="d-block text-muted">Processando...</small>
+                        `;
+                return false; // Continuar polling
+              default:
+                return true; // Parar polling em caso de status desconhecido
+            }
+          }
+          return true; // Parar polling em caso de erro
+        })
+        .catch(() => true); // Parar polling em caso de erro
+    };
+
+    // Função recursiva para fazer polling a cada 2 segundos
+    const poll = () => {
+      setTimeout(() => {
+        const routeStillExists = document.querySelector(`tr[data-route-id="${routeId}"]`);
+        if (routeStillExists && !checkStatus()) {
+          poll(); // Continuar polling se necessário e se a rota ainda existir na página
+        }
+      }, 2000);
+    };
+
+    poll(); // Iniciar polling
+  }
+
+  function deleteRoute(routeId) {
+    if (confirm('Tem certeza que deseja excluir esta rota?')) {
+      fetch(`/route/${routeId}/delete`, {
+        method: 'POST',
+      })
+        .then(response => {
+          if (response.ok) {
+            location.reload();
+          } else {
+            alert('Erro ao excluir rota');
+          }
+        });
+    }
+  }
+
+  function saveAsTemplate(routeId) {
+    if (confirm('Deseja salvar esta rota como template?')) {
+      fetch(`/routes/${routeId}/save-template`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-CSRFToken': document.querySelector('meta[name="csrf-token"]').content
+        },
+        credentials: 'same-origin'
+      })
+        .then(response => response.json())
+        .then(data => {
+          if (data.success) {
+            alert(data.message);
+            window.location.href = '/templates';
+          } else {
+            alert(data.message || 'Erro ao salvar template');
+          }
+        })
+        .catch(error => {
+          console.error('Erro:', error);
+          alert('Erro ao salvar template');
+        });
+    }
+  }
+
+  // Toggle between existing and new location fields
+  document.querySelectorAll('input[name="starting_point_type"]').forEach(radio => {
+    radio.addEventListener('change', function () {
+      const existingFields = document.getElementById('existingLocationFields');
+      const newFields = document.getElementById('newLocationFields');
+
+      if (this.value === 'existing') {
+        existingFields.style.display = 'block';
+        newFields.style.display = 'none';
+      } else {
+        existingFields.style.display = 'none';
+        newFields.style.display = 'block';
+      }
+    });
+  });
+</script>
+{% endblock %}

@@ -1,0 +1,432 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+  <meta name="csrf-token" content="{{ csrf_token() }}">
+  <title>{% block title %}Sistema de Gerenciamento de Rotas{% endblock %}</title>
+  <!-- Bootstrap CSS -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <!-- Font Awesome -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <!-- Custom CSS -->
+  <style>
+    :root {
+      --primary-color: #0d6efd;
+      --secondary-color: #6c757d;
+      --success-color: #198754;
+      --info-color: #0dcaf0;
+      --warning-color: #ffc107;
+      --danger-color: #dc3545;
+      --light-color: #f8f9fa;
+      --dark-color: #212529;
+    }
+
+    body {
+      background-color: #f8f9fa;
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    }
+
+    .navbar {
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    }
+
+    .navbar-brand {
+      font-weight: 600;
+    }
+
+    .sidebar {
+      min-height: calc(100vh - 56px);
+      background-color: white;
+      border-right: 1px solid #dee2e6;
+      box-shadow: 2px 0 4px rgba(0, 0, 0, 0.05);
+    }
+
+    .nav-link {
+      color: black;
+      padding: 0.75rem 1rem;
+      border-radius: 8px;
+      margin: 0.25rem 0;
+      transition: all 0.3s ease;
+    }
+
+    .nav-link:hover {
+      background-color: var(--light-color);
+      color: var(--primary-color);
+    }
+
+    .nav-link.active {
+      background-color: var(--primary-color);
+      color: white;
+    }
+
+    .nav-link i {
+      width: 20px;
+      text-align: center;
+    }
+
+    .main-content {
+      padding: 2rem;
+    }
+
+    .card {
+      border: none;
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+      transition: all 0.3s ease;
+    }
+
+    .card:hover {
+      box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+    }
+
+    .btn {
+      border-radius: 8px;
+      padding: 0.5rem 1rem;
+      font-weight: 500;
+      transition: all 0.3s ease;
+    }
+
+    .btn-primary {
+      background-color: var(--primary-color);
+      border-color: var(--primary-color);
+    }
+
+    .btn-primary:hover {
+      background-color: #0b5ed7;
+      border-color: #0b5ed7;
+    }
+
+    .alert {
+      border: none;
+      border-radius: 8px;
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+    }
+
+    .footer {
+      background-color: white;
+      border-top: 1px solid #dee2e6;
+      padding: 1rem 0;
+      margin-top: 2rem;
+    }
+  </style>
+  {% block extra_css %}{% endblock %}
+</head>
+
+<body>
+  <!-- Navbar -->
+  <nav class="navbar navbar-expand-lg navbar-dark bg-primary">
+    <div class="container-fluid">
+      <a class="navbar-brand d-flex align-items-center" href="{{ url_for('main.index') }}">
+        <i class="fas fa-route me-2 d-none d-md-table-cell"></i> <span class="d-none d-md-inline"> Otimizador de Rotas </span>
+        {% if current_user.is_authenticated and current_user.company %}
+        <span class="ms-2 badge bg-light text-primary">{{ current_user.company.name }}</span>
+        {% endif %}
+      </a>
+      <!-- Mobile Toggler - Targets #mobileMenu -->
+      <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#mobileMenu" aria-controls="mobileMenu" aria-expanded="false" aria-label="Toggle navigation">
+        <span class="navbar-toggler-icon"></span>
+      </button>
+
+      <!-- Desktop Content Container (Handled by navbar-expand-lg) -->
+      <div class="collapse navbar-collapse" id="navbarMainContent">
+        <ul class="navbar-nav ms-auto d-none d-lg-flex">
+          {% if current_user.is_authenticated %}
+          <li class="nav-item dropdown">
+            <a class="nav-link dropdown-toggle" href="#" id="userDropdown" role="button" data-bs-toggle="dropdown">
+              <i class="fas fa-user"></i>{{ current_user.username }}
+              {% if current_user.is_admin() %}
+              <span class="badge bg-danger">Admin</span>
+              {% elif current_user.is_manager() %}
+              <span class="badge bg-info">Gerente</span>
+              {% else %}
+              <span class="badge bg-success">Vendedor</span>
+              {% endif %}
+            </a>
+            <ul class="dropdown-menu dropdown-menu-end">
+              <li>
+                <a class="dropdown-item" href="{{ url_for('auth.profile') }}">
+                  <i class="fas fa-id-card"></i>Perfil
+                </a>
+              </li>
+              <li>
+                <hr class="dropdown-divider">
+              </li>
+              <li>
+                <a class="dropdown-item" href="{{ url_for('auth.logout') }}">
+                  <i class="fas fa-sign-out-alt"></i>Sair
+                </a>
+              </li>
+            </ul>
+          </li>
+          {% else %}
+          <li class="nav-item">
+            <a class="nav-link" href="{{ url_for('auth.login') }}">
+              <i class="fas fa-sign-in-alt"></i>Entrar
+            </a>
+          </li>
+          <li class="nav-item">
+            <a class="nav-link" href="{{ url_for('auth.register') }}">
+              <i class="fas fa-user-plus"></i>Registrar
+            </a>
+          </li>
+          {% endif %}
+        </ul>
+      </div>
+
+      <!-- Mobile Menu Container (Separate Collapse, Hidden on lg) -->
+      <div class="collapse w-100 d-lg-none" id="mobileMenu">
+        <ul class="navbar-nav me-auto mt-2 mt-lg-0">
+          <!-- User Info for Mobile -->
+          {% if current_user.is_authenticated %}
+          <li class="nav-item dropdown mb-2">
+            <a class="nav-link dropdown-toggle" href="#" id="mobileUserDropdown" role="button" data-bs-toggle="dropdown">
+              <i class="fas fa-user"></i>{{ current_user.username }}
+              {% if current_user.is_admin() %}
+              <span class="badge bg-danger">Admin</span>
+              {% elif current_user.is_manager() %}
+              <span class="badge bg-info">Gerente</span>
+              {% else %}
+              <span class="badge bg-success">Vendedor</span>
+              {% endif %}
+            </a>
+            <ul class="dropdown-menu">
+              <li>
+                <a class="dropdown-item" href="{{ url_for('auth.profile') }}">
+                  <i class="fas fa-id-card"></i>Perfil
+                </a>
+              </li>
+              <li>
+                <hr class="dropdown-divider">
+              </li>
+              <li>
+                <a class="dropdown-item" href="{{ url_for('auth.logout') }}">
+                  <i class="fas fa-sign-out-alt"></i>Sair
+                </a>
+              </li>
+            </ul>
+          </li>
+          <hr class="d-lg-none text-white-50"> {% endif %}
+
+          <!-- Navigation Links for Mobile (Copied from Sidebar) -->
+          {% if current_user.is_authenticated %}
+          <li class="nav-item">
+            <a class="nav-link {% if request.endpoint == 'main.dashboard' %}active{% endif %}" href="{{ url_for('main.dashboard') }}">
+              <i class="fas fa-tachometer-alt me-2"></i>Dashboard
+            </a>
+          </li>
+          <li class="nav-item">
+            <a class="nav-link {% if request.endpoint == 'main.routes' %}active{% endif %}" href="{{ url_for('main.routes') }}">
+              <i class="fas fa-route me-2"></i>Rotas
+            </a>
+          </li>
+          <li class="nav-item">
+            <a class="nav-link {% if request.endpoint == 'main.locations' %}active{% endif %}" href="{{ url_for('main.locations') }}">
+              <i class="fas fa-map-marker-alt me-2"></i>Locais
+            </a>
+          </li>
+          {% if current_user.is_admin() or current_user.is_manager() %}
+          <li class="nav-item">
+            <a class="nav-link {% if request.endpoint == 'main.manage_users' %}active{% endif %}" href="{{ url_for('main.manage_users') }}">
+              <i class="fas fa-users me-2"></i>Gerenciar Usuários
+            </a>
+          </li>
+          {% endif %}
+          {% if current_user.is_admin() %}
+          <li class="nav-item">
+            <a class="nav-link {% if request.endpoint == 'main.settings' %}active{% endif %}" href="{{ url_for('main.settings') }}">
+              <i class="fas fa-cog me-2"></i>Configurações
+            </a>
+          </li>
+          {% endif %}
+          <li class="nav-item">
+            <a class="nav-link {% if request.endpoint == 'main.completed_routes' %}active{% endif %}" href="{{ url_for('main.completed_routes') }}">
+              <i class="fas fa-check-circle me-2"></i>Rotas Concluídas
+            </a>
+          </li>
+          {% if current_user.is_admin() or current_user.is_manager() %}
+          <li class="nav-item">
+            <a class="nav-link {% if request.endpoint == 'main.sellers_statistics' %}active{% endif %}" href="{{ url_for('main.sellers_statistics') }}">
+              <i class="fas fa-chart-bar me-2"></i>Estatísticas dos Vendedores
+            </a>
+          </li>
+          {% endif %}
+          {% if current_user.is_seller() %}
+          <li class="nav-item">
+            <a class="nav-link {% if request.endpoint == 'main.seller_stats' %}active{% endif %}" href="{{ url_for('main.seller_stats', seller_id=current_user.id) }}">
+              <i class="fas fa-chart-line me-2"></i>Minhas Estatísticas
+            </a>
+          </li>
+          {% endif %}
+          {% else %}
+          <!-- Login/Register for Mobile -->
+          <li class="nav-item">
+            <a class="nav-link" href="{{ url_for('auth.login') }}">
+              <i class="fas fa-sign-in-alt"></i>Entrar
+            </a>
+          </li>
+          <li class="nav-item">
+            <a class="nav-link" href="{{ url_for('auth.register') }}">
+              <i class="fas fa-user-plus"></i>Registrar
+            </a>
+          </li>
+          {% endif %}
+        </ul>
+      </div>
+    </div>
+  </nav>
+
+  <!-- Main Content -->
+  <div class="container-fluid">
+    <div class="row">
+      {% if current_user.is_authenticated %}
+      <!-- Sidebar (Only for Medium screens and up) -->
+      <div class="col-md-3 col-lg-2 d-none d-md-block sidebar" id="sidebar">
+        <div class="position-sticky pt-3">
+          <div class="d-flex flex-column h-100">
+            <!-- User Profile (Sidebar version) -->
+            <div class="user-profile mb-4 text-center d-none d-md-block">
+              <div class="user-initial mb-2 mx-auto">
+                {{ current_user.username[0] | upper }}
+              </div>
+              <h6 class="mb-0">{{ current_user.username }}</h6>
+              <small class="text-muted">
+                {% if current_user.is_admin() %}
+                Administrador
+                {% elif current_user.is_manager() %}
+                Gerente de Vendas
+                {% else %}
+                Vendedor
+                {% endif %}
+              </small>
+            </div>
+
+            <!-- Navigation Links (Sidebar version) -->
+            <ul class="nav flex-column mb-auto">
+              <li class="nav-item">
+                <a class="nav-link {% if request.endpoint == 'main.dashboard' %}active{% endif %}" href="{{ url_for('main.dashboard') }}">
+                  <i class="fas fa-tachometer-alt me-2"></i>Dashboard
+                </a>
+              </li>
+              <li class="nav-item">
+                <a class="nav-link {% if request.endpoint == 'main.routes' %}active{% endif %}" href="{{ url_for('main.routes') }}">
+                  <i class="fas fa-route me-2"></i>Rotas
+                </a>
+              </li>
+              <li class="nav-item">
+                <a class="nav-link {% if request.endpoint == 'main.locations' %}active{% endif %}" href="{{ url_for('main.locations') }}">
+                  <i class="fas fa-map-marker-alt me-2"></i>Locais
+                </a>
+              </li>
+              {% if current_user.is_admin() or current_user.is_manager() %}
+              <li class="nav-item">
+                <a class="nav-link {% if request.endpoint == 'main.manage_users' %}active{% endif %}" href="{{ url_for('main.manage_users') }}">
+                  <i class="fas fa-users me-2"></i>Gerenciar Usuários
+                </a>
+              </li>
+              {% endif %}
+              {% if current_user.is_admin() %}
+              <li class="nav-item">
+                <a class="nav-link {% if request.endpoint == 'main.settings' %}active{% endif %}" href="{{ url_for('main.settings') }}">
+                  <i class="fas fa-cog me-2"></i>Configurações
+                </a>
+              </li>
+              {% endif %}
+              <li class="nav-item">
+                <a class="nav-link {% if request.endpoint == 'main.completed_routes' %}active{% endif %}" href="{{ url_for('main.completed_routes') }}">
+                  <i class="fas fa-check-circle me-2"></i>Rotas Concluídas
+                </a>
+              </li>
+              {% if current_user.is_admin() or current_user.is_manager() %}
+              <li class="nav-item">
+                <a class="nav-link {% if request.endpoint == 'main.sellers_statistics' %}active{% endif %}" href="{{ url_for('main.sellers_statistics') }}">
+                  <i class="fas fa-chart-bar me-2"></i>Estatísticas dos Vendedores
+                </a>
+              </li>
+              {% endif %}
+              {% if current_user.is_seller() %}
+              <li class="nav-item">
+                <a class="nav-link {% if request.endpoint == 'main.seller_stats' %}active{% endif %}" href="{{ url_for('main.seller_stats', seller_id=current_user.id) }}">
+                  <i class="fas fa-chart-line me-2"></i>Minhas Estatísticas
+                </a>
+              </li>
+              {% endif %}
+            </ul>
+          </div>
+        </div>
+      </div>
+      <!-- Main Content -->
+      <main class="col-md-9 ms-sm-auto col-lg-10 px-md-4 main-content">
+        {% else %}
+        <!-- Main Content (Full Width) -->
+        <main class="col-12 main-content">
+          {% endif %}
+          <!-- Flash Messages -->
+          {% with messages = get_flashed_messages(with_categories=true) %}
+          {% if messages %}
+          {% for category, message in messages %}
+          <div class="alert alert-{{ category if category != 'message' else 'info' }} alert-dismissible fade show mt-3">
+            {{ message }}
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+          </div>
+          {% endfor %}
+          {% endif %}
+          {% endwith %}
+
+          <!-- Page Content -->
+          {% block content %}{% endblock %}
+        </main>
+    </div>
+  </div>
+
+  <!-- Footer -->
+  <footer class="footer text-center">
+    <div class="container">
+      <span class="text-muted">© 2025 Otimizador de Rotas. Todos os direitos reservados.</span>
+    </div>
+  </footer>
+
+  <!-- Scripts -->
+  <!-- jQuery -->
+  <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+  <!-- Bootstrap JS -->
+  <script src="https://cdn.jsdelivr.net/npm/@popperjs/core@2.11.6/dist/umd/popper.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+  <!-- Font Awesome -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/js/all.min.js"></script>
+  <!-- Toastr para notificações -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/toastr.js/latest/toastr.min.css">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/toastr.js/latest/toastr.min.js"></script>
+
+  <!-- Custom JS -->
+  <script src="{{ url_for('static', filename='js/route_management.js') }}"></script>
+  <script src="{{ url_for('static', filename='js/geolocation.js') }}"></script>
+  <script src="{{ url_for('static', filename='js/haversine.js') }}"></script>
+  <script src="{{ url_for('static', filename='js/route_stats.js') }}"></script>
+  <script src="{{ url_for('static', filename='js/check_in_out.js') }}"></script>
+  <script src="{{ url_for('static', filename='js/seller_stats.js') }}"></script>
+
+  <script>
+    // Configurar token CSRF para todas as requisições AJAX
+    const csrfToken = "{{ csrf_token() }}";
+
+    // Configuração do toastr (notificações)
+    toastr.options = {
+      "closeButton": true,
+      "progressBar": true,
+      "positionClass": "toast-top-right",
+      "timeOut": "5000"
+    };
+
+    // Configurar o cabeçalho CSRF para todas as requisições AJAX
+    $.ajaxSetup({
+      headers: {
+        'X-CSRFToken': csrfToken
+      }
+    });
+  </script>
+
+  {% block scripts %}{% endblock %}
+</body>
+
+</html>

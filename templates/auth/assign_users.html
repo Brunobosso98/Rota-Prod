@@ -1,0 +1,72 @@
+{% extends 'base.html' %}
+
+{% block title %}{{ title }}{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="row">
+        <div class="col-md-8 offset-md-2">
+            <div class="card shadow">
+                <div class="card-header bg-primary text-white">
+                    <h4 class="mb-0">{{ title }}</h4>
+                </div>
+                <div class="card-body">
+                    {% if current_user.is_admin() %}
+                    <div class="card mb-4">
+                        <div class="card-header">
+                            <h5 class="mb-0">Gerenciar Usuários</h5>
+                        </div>
+                        <div class="card-body">
+                            <form method="POST" action="{{ url_for('auth.delete_user', user_id=user.id) }}" class="d-inline">
+                                <button type="submit" class="btn btn-danger" onclick="return confirm('Tem certeza que deseja excluir este usuário? Esta ação não pode ser desfeita.')">
+                                    Excluir Usuário
+                                </button>
+                            </form>
+                        </div>
+                    </div>
+                    {% endif %}
+                    
+                    <form method="POST">
+                        {{ form.hidden_tag() }}
+                        
+                        <div class="form-group mb-3">
+                            {{ form.users.label(class="form-label") }}
+                            <div class="alert alert-info">
+                                Segure a tecla CTRL para selecionar múltiplos usuários.
+                            </div>
+                            {{ form.users(class="form-select", size=10, multiple=true) }}
+                            {% for error in form.users.errors %}
+                                <div class="text-danger">{{ error }}</div>
+                            {% endfor %}
+                        </div>
+                        
+                        <div class="d-grid gap-2">
+                            {{ form.submit(class="btn btn-primary") }}
+                            <a href="{{ url_for('main.manage_users') }}" class="btn btn-secondary">Cancelar</a>
+                        </div>
+                    </form>
+                    
+                    {% if user.managers %}
+                    <div class="mt-4">
+                        <h3>Gerentes Atuais</h3>
+                        <div class="list-group">
+                            {% for manager in user.managers %}
+                            <div class="list-group-item d-flex justify-content-between align-items-center">
+                                {{ manager.name }}
+                                {% if current_user.is_admin() %}
+                                <form method="POST" action="{{ url_for('auth.unassign_manager', seller_id=user.id) }}" class="d-inline">
+                                    <input type="hidden" name="manager_id" value="{{ manager.id }}">
+                                    <button type="submit" class="btn btn-sm btn-outline-danger">Desvincular</button>
+                                </form>
+                                {% endif %}
+                            </div>
+                            {% endfor %}
+                        </div>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %} 

@@ -1,0 +1,338 @@
+{% extends 'base.html' %}
+
+{% block title %}Rotas Concluídas{% endblock %}
+
+{% block content %}
+<!-- Adicionar o elemento route-data no início do conteúdo -->
+<div id="route-data"></div>
+
+<div class="container mt-4">
+    <div class="row mb-4">
+        <div class="col-md-12">
+            <div class="d-flex justify-content-between align-items-center">
+                <h2>Rotas Concluídas</h2>
+                <a href="{{ url_for('main.routes') }}" class="btn btn-primary">
+                    <i class="fas fa-route"></i> Rotas Ativas
+                </a>
+            </div>
+        </div>
+    </div>
+
+    {% if routes_by_creator %}
+    {% for creator, routes in routes_by_creator.items() %}
+    <div class="card shadow mb-4">
+        <div class="card-header bg-success text-white">
+            <h4 class="mb-0">Rotas criadas por: {{ creator }}</h4>
+        </div>
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table table-hover">
+                    <thead>
+                        <tr>
+                            <th>Nome</th>
+                            <th>Data de Criação</th>
+                            <th>Data de Conclusão</th>
+                            <th>Locais Visitados</th>
+                            <th>Tempo Médio de Trabalho</th>
+                            <th>Tempo Médio de Deslocamento</th>
+                            <th>Ações</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for route in routes %}
+                        <tr>
+                            <td>{{ route.name }}</td>
+                            <td>{{ route.created_at.strftime('%d/%m/%Y') }}</td>
+                            <td>{{ route.completed_at.strftime('%d/%m/%Y %H:%M') if route.completed_at else 'N/A' }}</td>
+                            <td>
+                                {% set visited = route.points|selectattr('is_visited', 'eq', true)|list|length %}
+                                {% set total = route.points|length %}
+                                {% set percent = (visited / total * 100) if total > 0 else 0 %}
+                                <div class="progress">
+                                    <div class="progress-bar bg-success" role="progressbar" style="width: {{ percent }}%">
+                                        {{ visited }}/{{ total }}
+                                    </div>
+                                </div>
+                            </td>
+                            <td>
+                                {% set avg_work = route.get_avg_work_time() %}
+                                {% if avg_work is not none %}
+                                {{ "%.1f"|format(avg_work) }} min
+                                {% else %}
+                                N/A
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% set avg_transit = route.get_avg_transit_time() %}
+                                {% if avg_transit is not none %}
+                                {{ "%.1f"|format(avg_transit) }} min
+                                {% else %}
+                                N/A
+                                {% endif %}
+                            </td>
+                            <td>
+                                <div class="btn-group">
+                                    <a href="{{ url_for('main.view_route', route_id=route.id) }}" class="btn btn-sm btn-info">
+                                        <i class="fas fa-eye"></i> Visualizar
+                                    </a>
+                                    <button type="button" class="btn btn-sm btn-primary view-stats-btn" data-route-id="{{ route.id }}" data-bs-toggle="modal" data-bs-target="#routeStatsModal">
+                                        <i class="fas fa-chart-line"></i> Estatísticas
+                                    </button>
+                                    <a href="{{ url_for('main.route_detailed_stats', route_id=route.id) }}" class="btn btn-sm btn-dark">
+                                        <i class="fas fa-chart-bar"></i> Estatísticas Detalhadas
+                                    </a>
+                                    {% if current_user.is_admin() or current_user.is_manager() %}
+                                    <button type="button" class="btn btn-sm btn-secondary" onclick="window.saveAsTemplate({{ route.id }})">
+                                        <i class="fas fa-clone"></i> Salvar como Template
+                                    </button>
+                                    {% endif %}
+                                </div>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+    {% else %}
+    <div class="alert alert-info">
+        Nenhuma rota concluída encontrada.
+    </div>
+    {% endif %}
+</div>
+
+<!-- Modal de Estatísticas -->
+<div class="modal fade" id="routeStatsModal" tabindex="-1" aria-labelledby="routeStatsModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header bg-primary text-white">
+                <h5 class="modal-title" id="routeStatsModalLabel">Estatísticas da Rota</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Fechar"></button>
+            </div>
+            <div class="modal-body">
+                <div class="text-center py-4" id="stats-loading">
+                    <div class="spinner-border text-primary" role="status">
+                        <span class="visually-hidden">Carregando...</span>
+                    </div>
+                    <p class="mt-2">Carregando estatísticas...</p>
+                </div>
+
+                <div id="stats-content" style="display: none;">
+                    <div class="row mb-4">
+                        <div class="col-md-12">
+                            <h4 id="stats-route-name" class="text-center mb-4"></h4>
+                        </div>
+                    </div>
+
+                    <!-- Cards de estatísticas -->
+                    <div class="row mb-4">
+                        <div class="col-md-3">
+                            <div class="card text-white bg-success h-100">
+                                <div class="card-body text-center">
+                                    <h6 class="card-title">Tempo Médio de Trabalho</h6>
+                                    <p class="card-text fs-2 fw-bold" id="stats-avg-work-time">-</p>
+                                    <small>minutos por local</small>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="card text-white bg-warning h-100">
+                                <div class="card-body text-center">
+                                    <h6 class="card-title">Tempo Médio de Deslocamento</h6>
+                                    <p class="card-text fs-2 fw-bold" id="stats-avg-transit-time">-</p>
+                                    <small>minutos entre locais</small>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="card text-white bg-info h-100">
+                                <div class="card-body text-center">
+                                    <h6 class="card-title">Tempo Total de Trabalho</h6>
+                                    <p class="card-text fs-2 fw-bold" id="stats-total-work-time">-</p>
+                                    <small>minutos</small>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="card text-white bg-primary h-100">
+                                <div class="card-body text-center">
+                                    <h6 class="card-title">Tempo Total de Deslocamento</h6>
+                                    <p class="card-text fs-2 fw-bold" id="stats-total-transit-time">-</p>
+                                    <small>minutos</small>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Tabela de locais -->
+                    <div class="row">
+                        <div class="col-md-12">
+                            <h5 class="mb-3">Detalhes por Local</h5>
+                            <div class="table-responsive">
+                                <table class="table table-striped table-hover" id="stats-locations-table">
+                                    <thead>
+                                        <tr>
+                                            <th>Ordem</th>
+                                            <th>Local</th>
+                                            <th>Check-in</th>
+                                            <th>Check-out</th>
+                                            <th>Tempo de Trabalho</th>
+                                            <th>Tempo de Deslocamento</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody></tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="alert alert-warning mt-3" id="stats-no-data" style="display: none;">
+                        <i class="fas fa-exclamation-triangle"></i> Não há dados de check-in e check-out registrados para esta rota.
+                    </div>
+                </div>
+
+                <div id="stats-error" class="alert alert-danger" style="display: none;">
+                    <i class="fas fa-times-circle"></i> Erro ao carregar estatísticas.
+                    <p id="stats-error-message" class="mb-0 mt-2"></p>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Fechar</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/route_interactions.js') }}"></script>
+<script>
+    $(document).ready(function () {
+        // CSRF Token
+        const csrfToken = "{{ csrf_token() }}";
+
+        // Handler para o botão de visualizar estatísticas
+        $('.view-stats-btn').on('click', function () {
+            const routeId = $(this).data('route-id');
+
+            // Resetar o modal
+            $('#stats-loading').show();
+            $('#stats-content').hide();
+            $('#stats-error').hide();
+
+            // Limpar tabela de locais
+            $('#stats-locations-table tbody').empty();
+
+            // Carregar estatísticas
+            loadRouteStats(routeId);
+        });
+
+        // Função para carregar estatísticas da rota
+        function loadRouteStats(routeId) {
+            $.ajax({
+                url: `/routes/${routeId}/stats`,
+                type: 'GET',
+                headers: {
+                    'X-Requested-With': 'XMLHttpRequest'
+                },
+                success: function (response) {
+                    if (response.success) {
+                        updateStatsUI(response);
+                    } else {
+                        showStatsError(response.message || 'Erro ao carregar estatísticas.');
+                    }
+                },
+                error: function (xhr, status, error) {
+                    console.error('Erro ao carregar estatísticas:', error, xhr.responseText);
+
+                    try {
+                        const response = xhr.responseJSON || JSON.parse(xhr.responseText);
+                        showStatsError(response.message || 'Erro ao processar solicitação.');
+                    } catch (e) {
+                        showStatsError('Erro ao processar solicitação: ' + error);
+                    }
+                }
+            });
+        }
+
+        // Função para atualizar a UI com as estatísticas
+        function updateStatsUI(data) {
+            // Esconder loading e mostrar conteúdo
+            $('#stats-loading').hide();
+            $('#stats-content').show();
+
+            // Atualizar título
+            $('#stats-route-name').text(data.route_name);
+
+            // Atualizar cards de estatísticas
+            $('#stats-avg-work-time').text(data.avg_work_time !== null ? data.avg_work_time.toFixed(1) : '-');
+            $('#stats-avg-transit-time').text(data.avg_transit_time !== null ? data.avg_transit_time.toFixed(1) : '-');
+            $('#stats-total-work-time').text(data.total_work_time !== null ? data.total_work_time : '-');
+            $('#stats-total-transit-time').text(data.total_transit_time !== null ? data.total_transit_time : '-');
+
+            // Preencher tabela de locais
+            const locationsTable = $('#stats-locations-table tbody');
+            locationsTable.empty();
+
+            if (data.locations && data.locations.length > 0) {
+                data.locations.forEach(function (loc) {
+                    const row = `
+                        <tr>
+                            <td>${loc.order}</td>
+                            <td>${loc.name}</td>
+                            <td>${loc.check_in_at || '-'}</td>
+                            <td>${loc.check_out_at || '-'}</td>
+                            <td>${loc.work_time !== null ? loc.work_time + ' min' : '-'}</td>
+                            <td>${loc.transit_time !== null ? loc.transit_time + ' min' : '-'}</td>
+                        </tr>
+                    `;
+                    locationsTable.append(row);
+                });
+
+                // Esconder mensagem de sem dados
+                $('#stats-no-data').hide();
+            } else {
+                // Mostrar mensagem de sem dados
+                $('#stats-no-data').show();
+            }
+        }
+
+        // Função para mostrar erro
+        function showStatsError(message) {
+            $('#stats-loading').hide();
+            $('#stats-content').hide();
+            $('#stats-error').show();
+            $('#stats-error-message').text(message);
+        }
+    });
+
+    // Função global para salvar como template
+    window.saveAsTemplate = function (routeId) {
+        if (confirm('Deseja salvar esta rota como template?')) {
+            fetch(`/routes/${routeId}/save-template`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': document.querySelector('meta[name="csrf-token"]').content
+                },
+                credentials: 'same-origin'
+            })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        alert(data.message);
+                        window.location.href = '/templates';
+                    } else {
+                        alert(data.message || 'Erro ao salvar template');
+                    }
+                })
+                .catch(error => {
+                    console.error('Erro:', error);
+                    alert('Erro ao salvar template');
+                });
+        }
+    };
+</script>
+{% endblock %}

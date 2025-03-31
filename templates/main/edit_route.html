@@ -1,0 +1,75 @@
+{% extends 'base.html' %}
+
+{% block title %}Editar Rota{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+  <div class="row">
+    <div class="col-md-8 offset-md-2">
+      <div class="card shadow">
+        <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
+          <h4 class="mb-0">Editar Rota</h4>
+          <a href="{{ url_for('main.view_route', route_id=route.id) }}" class="btn btn-sm btn-light">
+            <i class="fas fa-arrow-left"></i> Voltar
+          </a>
+        </div>
+        <div class="card-body">
+          <form method="POST" action="{{ url_for('main.edit_route', route_id=route.id) }}">
+            {{ form.hidden_tag() }}
+
+            <div class="form-group mb-3">
+              {{ form.name.label(class="form-label") }}
+              {{ form.name(class="form-control") }}
+              {% for error in form.name.errors %}
+              <div class="text-danger">{{ error }}</div>
+              {% endfor %}
+            </div>
+
+            <div class="form-group mb-3">
+              {{ form.description.label(class="form-label") }}
+              {{ form.description(class="form-control", rows=3) }}
+              {% for error in form.description.errors %}
+              <div class="text-danger">{{ error }}</div>
+              {% endfor %}
+            </div>
+
+            {% if current_user.is_admin() and form.managers.choices %}
+            <div class="form-group mb-3">
+              {{ form.managers.label(class="form-label") }}
+              <div class="alert alert-info">
+                Segure a tecla CTRL para selecionar múltiplos gerentes. Os vendedores de cada gerente serão automaticamente atribuídos à rota.
+              </div>
+              {{ form.managers(class="form-select", size=5, multiple=true) }}
+              {% for error in form.managers.errors %}
+              <div class="text-danger">{{ error }}</div>
+              {% endfor %}
+            </div>
+            {% endif %}
+
+            <div class="form-group mb-3">
+              {{ form.sellers.label(class="form-label") }}
+              <div class="alert alert-info">
+                Segure a tecla CTRL para selecionar múltiplos vendedores.
+              </div>
+              {{ form.sellers(class="form-select", size=10, multiple="multiple") }}
+              {% for error in form.sellers.errors %}
+              <div class="text-danger">{{ error }}</div>
+              {% endfor %}
+            </div>
+
+            <div class="alert alert-warning">
+              <i class="fas fa-info-circle"></i> Os locais da rota não podem ser alterados depois de criados.
+              Se precisar alterar os locais, crie uma nova rota.
+            </div>
+
+            <div class="d-grid gap-2">
+              {{ form.submit(class="btn btn-primary") }}
+              <a href="{{ url_for('main.view_route', route_id=route.id) }}" class="btn btn-secondary">Cancelar</a>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

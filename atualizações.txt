@@ -1,0 +1,20 @@
+Integrar o código e banco de dados com uma IA da openAI, o modelo 4o-mini por exemplo.
+Onde, se o usuário perguntar, algum dado como, quais são os nomes dos locais adicionados na cidade de itapira eu tenho?. (Ele interprete o banco de dados e retorne o nome dos locais e quantidade total).
+
+Claro, vai muito além disso, é possível?.
+Como passaríamos os dados do banco de dados para a IA?
+
+--------------------
+
+Backup do banco de dados
+
+------------------
+
+cd C:\nginx && start nginx.exe
+
+start ../../../../../nginx/nginx.exe -p ../../../../../nginx/ -c ../../../../../nginx/conf/nginx.conf
+
+start ../../../../../../nginx/nginx.exe -p ../../../../../../nginx/ -c ../../../../../../nginx/conf/nginx.conf
+
+1240.91 km, Tempo estimado: 982.5 min  - 389.03km do ponto de partida
+1269.01 km, Tempo estimado: 1005.4 min - 78.90km do ponto de partida

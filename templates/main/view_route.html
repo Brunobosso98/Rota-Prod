@@ -1,0 +1,562 @@
+{% extends "base.html" %}
+
+{% block head %}
+{{ super() }}
+<meta name="csrf-token" content="{{ csrf_token() }}">
+{% endblock %}
+
+{% block title %}{{ route.name }} - Otimizador de Rotas{% endblock %}
+
+{% block extra_css %}
+<style>
+    #map-container {
+        position: relative;
+        width: 100%;
+        padding-bottom: 56.25%;
+        /* 16:9 aspect ratio */
+        border-radius: 15px;
+        overflow: hidden;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    }
+
+    #map-container iframe {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+    }
+
+    @media (min-width: 768px) {
+        #map-container {
+            min-height: 500px;
+        }
+    }
+
+    .badge.transit-time {
+        background-color: #36b9cc !important;
+    }
+
+    .badge.work-time {
+        background-color: #1cc88a !important;
+    }
+
+    .time-badge {
+        margin-right: 5px;
+    }
+
+    /* Formatação para botões de check-in/check-out */
+    .action-buttons {
+        display: flex;
+        gap: 5px;
+        margin-top: 5px;
+    }
+
+    .action-buttons .btn {
+        flex: 1;
+        font-size: 0.8rem;
+        padding: 4px 8px;
+    }
+
+    /* Estados do botão */
+    .checked-in {
+        background-color: #fdeedc;
+        border-left: 5px solid #ffa94d;
+    }
+
+    .checked-out {
+        background-color: #e6f3e6;
+        border-left: 5px solid #40c057;
+    }
+</style>
+
+{% endblock %}
+
+{% block content %}
+<div id="route-data" data-route-id="{{ route.id }}" data-completed="{{ 'true' if route.is_completed else 'false' }}"></div>
+<div class="container mt-4">
+    <div class="row mb-4">
+        <div class="col-md-12">
+            {# Adjust flex alignment for mobile stacking #}
+            <div class="d-flex justify-content-between align-items-center  flex-column flex-md-row">
+                <h2 class="mb-3 mb-md-0"> {# Add margin bottom for mobile #}
+                    {{ route.name }}
+                    {% if route.is_completed %}
+                    <span class="badge bg-success">Concluída</span>
+                    {% endif %}
+                </h2>
+                {# Make button container responsive with gap #}
+                <div class="d-flex flex-column flex-md-row gap-2">
+                    <a href="{{ url_for('main.routes') }}" class="btn btn-secondary">
+                        <i class="fas fa-arrow-left"></i> Voltar
+                    </a>
+                    <a href="{{ url_for('main.edit_route', route_id=route.id) }}" class="btn btn-primary">
+                        <i class="fas fa-edit"></i> Editar Rota
+                    </a>
+
+                    {% if current_user.is_admin() or (current_user.is_manager() and route.creator_id == current_user.id) %}
+                    <form class="d-flex" action="{{ url_for('main.delete_route', route_id=route.id) }}" method="POST" onsubmit="return confirm('Tem certeza que deseja excluir esta rota?');">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                        <button type="submit" class="btn btn-danger flex-grow-1">
+                            <i class="fas fa-trash"></i> Excluir
+                        </button>
+                    </form>
+
+                    {% endif %}
+
+                    {% if not route.is_completed %}
+                    {% if route.optimization_status == 'optimizing' %}
+                    <button class="btn btn-warning" disabled>
+                        <i class="fas fa-cog fa-spin"></i> Otimizando...
+                    </button>
+                    {% elif route.optimization_status == 'optimized' %}
+                    <button class="btn btn-success" data-bs-toggle="modal" data-bs-target="#optimizeRouteModal">
+                        <i class="fas fa-check-circle"></i> Rota Otimizada
+                    </button>
+                    {% else %}
+                    <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#optimizeRouteModal">
+                        <i class="fas fa-magic"></i> Otimizar Rota
+                    </button>
+                    {% endif %}
+                    {% endif %}
+
+                    {% if not route.is_completed %}
+                    <button type="button" class="btn btn-danger" data-bs-toggle="modal" data-bs-target="#completeRouteModal">
+                        <i class="fas fa-check-circle"></i> Finalizar Rota
+                    </button>
+                    {% endif %} {# Moved endif inside the div #}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Informações da Rota -->
+<div class="row mb-4">
+    {# Add margin bottom for mobile, remove for md+ #}
+    <div class="col-md-4 col-sm-6 col-12 mb-3 mb-md-0">
+        <div class="card shadow h-100">
+            <div class="card-header bg-primary text-white">
+                <h5 class="mb-0">Informações da Rota</h5>
+            </div>
+            <div class="card-body">
+                <p><strong>Descrição:</strong> {{ route.description or 'Sem descrição' }}</p>
+                <p><strong>Criada por:</strong> {{ creator.username }}</p>
+                <p><strong>Data de Criação:</strong> {{ route.created_at.strftime('%d/%m/%Y %H:%M') }}</p>
+
+                {% if route.is_completed %}
+                <p><strong>Concluída em:</strong> {{ route.completed_at.strftime('%d/%m/%Y %H:%M') }}</p>
+                {% endif %}
+
+                <!-- Status de Otimização -->
+                <p>
+                    <strong>Status de Otimização:</strong>
+                    <span id="optimization-status-badge" class="badge 
+                        {% if route.optimization_status == 'optimized' %}bg-success
+                        {% elif route.optimization_status == 'optimizing' %}bg-warning
+                        {% else %}bg-secondary{% endif %}">
+                        {% if route.optimization_status == 'optimized' %}Otimizada
+                        {% elif route.optimization_status == 'optimizing' %}Em otimização...
+                        {% else %}Não otimizada{% endif %}
+                    </span>
+                </p>
+                {% if route.is_optimized and route.optimized_at %}
+                <p><strong>Otimizada em:</strong> <span id="optimized-at-date">{{ route.optimized_at.strftime('%d/%m/%Y %H:%M') }}</span></p>
+                {% endif %}
+
+                {% if route.parent_route %}
+                <p><strong>Rota Pai:</strong> <a href="{{ url_for('main.view_route', route_id=route.parent_route.id) }}">{{
+                        route.parent_route.name }}</a></p>
+                {% endif %}
+
+                {% if route.child_routes %}
+                <p><strong>Rotas Filhas:</strong></p>
+                <ul>
+                    {% for child in route.child_routes %}
+                    <li><a href="{{ url_for('main.view_route', route_id=child.id) }}">{{ child.name }}</a></li>
+                    {% endfor %}
+                </ul>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    {# Add margin bottom for mobile, remove for md+ #}
+    <div class="col-md-4 col-sm-6 col-12 mb-3 mb-md-0">
+        <div class="card shadow h-100">
+            <div class="card-header bg-info text-white">
+                <h5 class="mb-0">Vendedores Atribuídos</h5>
+            </div>
+            <div class="card-body">
+                {% if assigned_sellers %}
+                <ul class="list-group">
+                    {% for seller in assigned_sellers %}
+                    <li class="list-group-item">{{ seller.username }}</li>
+                    {% endfor %}
+                </ul>
+                {% else %}
+                <p class="text-muted">Nenhum vendedor atribuído a esta rota.</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-4 col-sm-6 col-12">
+        <div class="card shadow h-100">
+            <div class="card-header bg-success text-white">
+                <h5 class="mb-0">Progresso</h5>
+            </div>
+            <div class="card-body">
+                {% set visited = points|selectattr('is_visited', 'eq', true)|list|length %}
+                {% set total = points|length %}
+                {% set percent = (visited / total * 100) if total > 0 else 0 %}
+
+                <div class="text-center mb-3">
+                    <h1>{{ visited }}/{{ total }}</h1>
+                    <p>locais visitados</p>
+                </div>
+
+                <div class="progress mb-3" style="height: 25px">
+                    <div class="progress-bar bg-success" role="progressbar" style="width: {{ percent }}%" aria-valuenow="{{ visited }}" aria-valuemin="0" aria-valuemax="{{ total }}">
+                        {{ percent|round|int }}%
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Mapa e Pontos -->
+<div class="row">
+    <div class="col-md-8">
+        <div class="card shadow mb-4">
+            <div class="card-header bg-primary text-white">
+                <h5 class="mb-0">Mapa da Rota</h5>
+            </div>
+            <div class="card-body p-0">
+                <div id="map-container" style="position: relative; width: 100%; padding-bottom: 56.25%;">
+                    <iframe src="{{ url_for('static', filename=map_file) }}?v={{ timestamp }}" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; border:0;" allowfullscreen=""></iframe>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-4">
+        <div class="card shadow point-list">
+            <div class="card-header bg-primary text-white">
+                <h5 class="mb-0">Pontos da Rota</h5>
+            </div>
+            <div class="card-body">
+                <div class="alert alert-info">
+                    <i class="fas fa-info-circle"></i> <strong>Geolocalização ativada:</strong>
+                    Para marcar um local como visitado, você precisa estar fisicamente próximo dele.
+                </div>
+                <div class="list-group">
+                    {% for point in route.points|sort(attribute='order') %}
+                    <div class="list-group-item {% if point.is_visited %}list-group-item-success{% endif %}" data-point-id="{{ point.id }}">
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <div>
+                                <span class="badge {% if point.order == 0 %}bg-primary{% else %}bg-secondary{% endif %} me-1">{{ point.order }}</span>
+                                {% if point.name %}
+                                <strong>{{ point.name }}</strong>
+                                {% else %}
+                                <em>Sem nome</em>
+                                {% endif %}
+                                {% if point.telephone %}
+                                <p class="mb-1">
+                                    <i class="fas fa-phone"></i> {{ point.telephone }}
+                                </p>
+                                {% endif %}
+                            </div>
+                            <!-- Removida a informação de "Visitado em" que estava aqui -->
+                        </div>
+
+                        <div class="d-flex justify-content-between align-items-start">
+                            <div class="small text-muted">
+                                {% if point.location_id and point.order > 0 %}
+                                <p class="mb-1">
+                                    <i class="fas fa-map-marker-alt"></i> {{ point.city }} - {{ point.state }}
+                                </p>
+                                {# Find the associated Location object to display street/number #}
+                                {% set location = route.locations|selectattr('id', 'eq', point.location_id)|first %}
+                                {% if location and (location.street or location.number) %}
+                                <p class="mb-1">
+                                    <i class="fas fa-road"></i>
+                                    {{ location.street or '' }}
+                                    {% if location.number %}
+                                    , {{ location.number }}
+                                    {% endif %}
+                                </p>
+                                {% endif %}
+                                {% endif %}
+
+                                {% if point.order == 0 %}
+                                <p class="mb-1">
+                                    <i class="fas fa-map-pin"></i> Ponto de Partida
+                                </p>
+                                {% endif %}
+
+                                {% if point.location_id %}
+                                {% set route_location = route.route_locations|selectattr('location_id', 'eq', point.location_id)|first %}
+                                {% if route_location and point.order > 0 %} {# Não mostrar botões para o ponto de partida (order=0) #}
+                                <div class="d-flex flex-column gap-2">
+                                    {% if route.is_completed %}
+                                    {% if route_location.check_in_at and route_location.check_out_at %}
+                                    <div class="mt-2 small">
+                                        <div><strong>Check-in:</strong> {{ route_location.check_in_at.strftime('%d/%m/%Y %H:%M:%S') }}</div>
+                                        <div><strong>Check-out:</strong> {{ route_location.check_out_at.strftime('%d/%m/%Y %H:%M:%S') }}</div>
+                                        <div><strong>Tempo de trabalho:</strong> {{ route_location.get_work_time() }} minutos</div>
+                                        <span class="badge bg-success">
+                                            <i class="fas fa-check-square"></i> Finalizado
+                                        </span>
+                                    </div>
+                                    {% else %}
+                                    <span class="badge bg-secondary">
+                                        <i class="fas fa-times"></i> Sem registros
+                                    </span>
+                                    {% endif %}
+                                    {% else %}
+                                    {% if not route_location.check_in_at %}
+                                    <button class="btn btn-sm btn-primary check-in-btn" data-route-id="{{ route.id }}" data-location-id="{{ point.location_id }}" data-lat="{{ point.latitude }}" data-lon="{{ point.longitude }}">
+                                        <i class="fas fa-sign-in-alt"></i> Check-in
+                                    </button>
+                                    {% elif not route_location.check_out_at %}
+                                    <button class="btn btn-sm btn-success check-out-btn" data-route-id="{{ route.id }}" data-location-id="{{ point.location_id }}">
+                                        <i class="fas fa-sign-out-alt"></i> Check-out
+                                    </button>
+                                    {% else %}
+                                    <span class="badge bg-success">
+                                        <i class="fas fa-check-square"></i> Finalizado
+                                    </span>
+                                    <div class="mt-2 small">
+                                        <div><strong>Check-in:</strong> {{ route_location.check_in_at.strftime('%d/%m/%Y %H:%M:%S') }}</div>
+                                        <div><strong>Check-out:</strong> {{ route_location.check_out_at.strftime('%d/%m/%Y %H:%M:%S') }}</div>
+                                        <div><strong>Tempo de trabalho:</strong> {{ route_location.get_work_time() }} minutos</div>
+                                    </div>
+                                    {% endif %}
+                                    {% endif %}
+                                </div>
+                                {% endif %}
+                                {% endif %}
+                            </div>
+
+                            {% if route.is_completed %}
+                            <!-- Nenhum botão para rotas concluídas -->
+                            {% else %}
+                            {% if point.order == 0 %}
+                            <!-- Botão para alterar ponto de partida -->
+                            <button class="btn btn-sm btn-primary change-starting-point" data-route-id="{{ route.id }}" data-bs-toggle="modal" data-bs-target="#changeStartingPointModal">
+                                <i class="fas fa-map-marker-alt"></i> Alterar Ponto de Partida
+                            </button>
+                            {% else %}
+
+                            {% endif %}
+                            {% endif %}
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal para finalizar rota -->
+<div class="modal fade" id="completeRouteModal" tabindex="-1" aria-labelledby="completeRouteModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="completeRouteModalLabel">Finalizar Rota</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
+            </div>
+            <div class="modal-body">
+                <p>Tem certeza que deseja finalizar esta rota?</p>
+                <p>Após finalizada, não será possível modificar os locais visitados.</p>
+
+                <form method="POST" action="{{ url_for('main.complete_route', route_id=route.id) }}">
+                    {{ complete_form.hidden_tag() }}
+                    <div class="form-check mb-3">
+                        {{ complete_form.confirm(class="form-check-input") }}
+                        {{ complete_form.confirm.label(class="form-check-label") }}
+                    </div>
+                    {{ complete_form.submit(class="btn btn-success") }}
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal para clonar rota -->
+{% if route.is_completed and clone_form %}
+<div class="modal fade" id="cloneRouteModal" tabindex="-1" aria-labelledby="cloneRouteModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="cloneRouteModalLabel">Clonar Rota</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
+            </div>
+            <div class="modal-body">
+                <p>Criar uma nova rota baseada nesta rota concluída.</p>
+
+                <form method="POST" action="{{ url_for('main.clone_route', route_id=route.id) }}">
+                    {{ clone_form.hidden_tag() }}
+                    <div class="form-group mb-3">
+                        {{ clone_form.name.label(class="form-label") }}
+                        {{ clone_form.name(class="form-control", value=route.name + ' (Nova)') }}
+                    </div>
+                    {{ clone_form.submit(class="btn btn-primary") }}
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+<!-- Modal para otimizar rota -->
+<div class="modal fade" id="optimizeRouteModal" tabindex="-1" aria-labelledby="optimizeRouteModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="optimizeRouteModalLabel">Otimizar Rota</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
+            </div>
+            <div class="modal-body">
+                {% if route.is_optimized %}
+                <div class="alert alert-success">
+                    <i class="fas fa-check-circle"></i> <strong>Esta rota já está otimizada!</strong>
+                    {% if route.optimized_at %}
+                    <p class="mb-0 mt-2">A rota foi otimizada em {{ route.optimized_at.strftime('%d/%m/%Y %H:%M') }}.</p>
+                    {% else %}
+                    <p class="mb-0 mt-2">A rota foi otimizada (data não disponível).</p>
+                    {% endif %}
+                </div>
+                {% endif %}
+
+                <p>Esta ação irá otimizar a ordem dos pontos da rota para minimizar a distância total percorrida.</p>
+                <p><strong>Observação:</strong> O ponto de partida selecionado (ordem 0) será mantido fixo e o algoritmo reorganizará os outros pontos para criar a rota mais eficiente.</p>
+                <p>Este processo pode levar alguns minutos para ser concluído, especialmente para rotas com muitos pontos.</p>
+
+                <form id="optimizeRouteForm"> {# Removed method and action, will handle via JS #}
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+                    {# Add the checkbox here #}
+                    <div class="form-check mb-3">
+                        <input class="form-check-input" type="checkbox" value="" id="returnToStartCheckbox">
+                        <label class="form-check-label" for="returnToStartCheckbox">
+                            Retornar ao Ponto de Partida (Rota Circular)
+                        </label>
+                        <small class="form-text text-muted d-block">Marque esta opção se o veículo deve retornar ao ponto inicial após visitar o último local.</small>
+                    </div>
+
+                    <button type="submit" class="btn btn-primary">Confirmar Otimização</button>
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal para alterar ponto de partida -->
+<div class="modal fade" id="changeStartingPointModal" tabindex="-1" aria-labelledby="changeStartingPointModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="changeStartingPointModalLabel">Alterar Ponto de Partida</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
+            </div>
+            <div class="modal-body">
+                <div class="alert alert-info">
+                    <i class="fas fa-info-circle"></i> Altere o ponto de partida da rota usando sua localização atual ou informando manualmente as coordenadas.
+                </div>
+
+                <!-- Opções para alterar o ponto de partida -->
+                <ul class="nav nav-tabs mb-3" id="startingPointTabs" role="tablist">
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link active" id="geolocation-tab" data-bs-toggle="tab" data-bs-target="#geolocation-content" type="button" role="tab" aria-controls="geolocation-content" aria-selected="true">
+                            <i class="fas fa-location-arrow"></i> Usar Minha Localização Atual
+                        </button>
+                    </li>
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link" id="manual-tab" data-bs-toggle="tab" data-bs-target="#manual-content" type="button" role="tab" aria-controls="manual-content" aria-selected="false">
+                            <i class="fas fa-edit"></i> Informar Coordenadas Manualmente
+                        </button>
+                    </li>
+                </ul>
+
+                <div class="tab-content" id="startingPointTabsContent">
+                    <!-- Aba de geolocalização -->
+                    <div class="tab-pane fade show active" id="geolocation-content" role="tabpanel" aria-labelledby="geolocation-tab">
+                        <div id="geo-status" class="alert alert-info mb-3">
+                            <span id="geo-message">Clique no botão abaixo para obter sua localização atual.</span>
+                        </div>
+
+                        <button type="button" class="btn btn-primary" id="getLocationBtn">
+                            <i class="fas fa-location-arrow"></i> Obter Minha Localização
+                        </button>
+
+                        <div class="mt-3" id="geo-position-display" style="display: none;">
+                            <div class="row mb-3">
+                                <div class="col-md-6">
+                                    <label class="form-label">Latitude:</label>
+                                    <input type="text" class="form-control" id="geo-latitude" readonly>
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label">Longitude:</label>
+                                    <input type="text" class="form-control" id="geo-longitude" readonly>
+                                </div>
+                            </div>
+
+                            <div class="form-check mb-3">
+                                <input class="form-check-input" type="checkbox" id="geo-optimize" checked>
+                                <label class="form-check-label" for="geo-optimize">
+                                    Otimizar rota após alterar o ponto de partida
+                                </label>
+                            </div>
+
+                            <button type="button" class="btn btn-success" id="geo-save-btn" disabled>
+                                <i class="fas fa-save"></i> Salvar Como Ponto de Partida
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Aba de coordenadas manuais -->
+                    <div class="tab-pane fade" id="manual-content" role="tabpanel" aria-labelledby="manual-tab">
+                        <div class="row mb-3">
+                            <div class="col-md-6">
+                                <label class="form-label">Latitude:</label>
+                                <input type="number" step="0.000001" class="form-control" id="manual-latitude" placeholder="-23.456789">
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Longitude:</label>
+                                <input type="number" step="0.000001" class="form-control" id="manual-longitude" placeholder="-46.789012">
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label">Nome do Ponto (opcional):</label>
+                            <input type="text" class="form-control" id="manual-name" placeholder="Ponto de Partida">
+                        </div>
+
+                        <div class="form-check mb-3">
+                            <input class="form-check-input" type="checkbox" id="manual-optimize" checked>
+                            <label class="form-check-label" for="manual-optimize">
+                                Otimizar rota após alterar o ponto de partida
+                            </label>
+                        </div>
+
+                        <button type="button" class="btn btn-success" id="manual-save-btn">
+                            <i class="fas fa-save"></i> Salvar Como Ponto de Partida
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+{{ super() }}
+<script src="{{ url_for('static', filename='js/geolocation.js') }}"></script>
+<script src="{{ url_for('static', filename='js/route_interactions.js') }}"></script>
+{% endblock %}

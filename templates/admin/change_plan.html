@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container">
+    <h2>Mudar Plano - {{ company.name }}</h2>
+    <form method="POST">
+        {{ form.hidden_tag() }}
+        <div class="mb-3">
+            {{ form.plan.label(class="form-label") }}
+            {{ form.plan(class="form-select") }}
+        </div>
+        {{ form.submit(class="btn btn-primary") }}
+        <a href="{{ url_for('admin.list_companies') }}" class="btn btn-secondary">Cancelar</a>
+    </form>
+</div>
+{% endblock %}

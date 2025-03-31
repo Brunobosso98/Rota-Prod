@@ -1,0 +1,206 @@
+{% extends 'base.html' %}
+
+{% block title %}Gerenciamento de Usuários{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="row mb-4">
+        <div class="col-md-12">
+            <div class="d-flex justify-content-between align-items-center">
+                <h2>Gerenciamento de Usuários</h2>
+                <a href="{{ url_for('auth.create_user') }}" class="btn btn-primary">
+                    <i class="fas fa-plus-circle"></i> Novo Usuário
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <!-- Gerentes -->
+    <div class="card shadow mb-4">
+        <div class="card-header bg-primary text-white">
+            <h4 class="mb-0">Gerentes de Vendas</h4>
+        </div>
+        <div class="card-body">
+            {% if managers %}
+            <div class="table-responsive">
+                <table class="table table-hover">
+                    <thead>
+                        <tr>
+                            <th>Nome</th>
+                            <th>Email</th>
+                            <th class="d-none d-md-table-cell">Data de Criação</th>
+                            <th>Ações</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for manager in managers %}
+                        <tr>
+                            <td>{{ manager.username }}</td>
+                            <td>{{ manager.email }}</td>
+                            <td class="d-none d-md-table-cell">{{ manager.created_at.strftime('%d/%m/%Y') }}</td>
+                            <td>
+                                <div class="d-flex flex-nowrap gap-1">
+                                    <button type="button" class="btn btn-sm btn-secondary" data-bs-toggle="modal" data-bs-target="#managerSellersModal{{ manager.id }}">
+                                        <i class="fas fa-eye"></i> Visualizar Vendedores
+                                    </button>
+                                    {% if current_user.is_admin() %}
+                                    <a href="{{ url_for('auth.assign_sellers_to_manager', manager_id=manager.id) }}" class="btn btn-sm btn-info">
+                                        <i class="fas fa-users"></i> Atribuir Vendedores
+                                    </a>
+                                    <form action="{{ url_for('auth.delete_user', user_id=manager.id) }}" method="POST" class="d-inline">
+                                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                        <button type="submit" class="btn btn-sm btn-danger" onclick="return confirm('Tem certeza que deseja excluir este gerente?');">
+                                            <i class="fas fa-trash"></i> Excluir
+                                        </button>
+                                    </form>
+                                    {% endif %}
+                                </div>
+                            </td>
+                        </tr>
+
+                        <!-- Modal para visualizar vendedores do gerente -->
+                        <div class="modal fade" id="managerSellersModal{{ manager.id }}" tabindex="-1" aria-labelledby="managerSellersModalLabel{{ manager.id }}" aria-hidden="true">
+                            <div class="modal-dialog">
+                                <div class="modal-content">
+                                    <div class="modal-header bg-primary text-white">
+                                        <h5 class="modal-title" id="managerSellersModalLabel{{ manager.id }}">Vendedores gerenciados por {{ manager.username }}</h5>
+                                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                                    </div>
+                                    <div class="modal-body">
+                                        {% if manager.managed_sellers.count() > 0 %}
+                                        <ul class="list-group">
+                                            {% for seller in manager.managed_sellers %}
+                                            <li class="list-group-item d-flex justify-content-between align-items-center">
+                                                {{ seller.username }}
+                                                <span class="badge bg-primary rounded-pill">{{ seller.email }}</span>
+                                                {% if current_user.is_admin() %}
+                                                <form action="{{ url_for('auth.unassign_seller', manager_id=manager.id) }}" method="POST" class="ms-2">
+                                                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                                    <input type="hidden" name="seller_id" value="{{ seller.id }}">
+                                                    <button type="submit" class="btn btn-sm btn-danger" onclick="return confirm('Tem certeza que deseja remover este vendedor do gerente?');">
+                                                        <i class="fas fa-times"></i>
+                                                    </button>
+                                                </form>
+                                                {% endif %}
+                                            </li>
+                                            {% endfor %}
+                                        </ul>
+                                        {% else %}
+                                        <div class="alert alert-info mb-0">
+                                            Este gerente não possui vendedores atribuídos.
+                                        </div>
+                                        {% endif %}
+                                    </div>
+                                    <div class="modal-footer">
+                                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Fechar</button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% else %}
+            <div class="alert alert-info">
+                Nenhum gerente de vendas cadastrado.
+            </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Vendedores -->
+    <div class="card shadow">
+        <div class="card-header bg-success text-white">
+            <h4 class="mb-0">Vendedores</h4>
+        </div>
+        <div class="card-body">
+            {% if sellers %}
+            <div class="table-responsive">
+                <table class="table table-hover">
+                    <thead>
+                        <tr>
+                            <th>Nome</th>
+                            <th>Email</th>
+                            <th class="d-none d-md-table-cell">Data de Criação</th>
+                            <th>Ações</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for seller in sellers %}
+                        <tr>
+                            <td>{{ seller.username }}</td>
+                            <td>{{ seller.email }}</td>
+                            <td class="d-none d-md-table-cell">{{ seller.created_at.strftime('%d/%m/%Y') }}</td>
+                            <td>
+                                <div class="d-flex flex-nowrap gap-1">
+                                    <button type="button" class="btn btn-sm btn-secondary" data-bs-toggle="modal" data-bs-target="#sellerManagersModal{{ seller.id }}">
+                                        <i class="fas fa-eye"></i> Visualizar Gerentes
+                                    </button>
+                                    {% if current_user.is_admin() %}
+                                    <a href="{{ url_for('auth.assign_managers_to_seller', seller_id=seller.id) }}" class="btn btn-sm btn-info">
+                                        <i class="fas fa-user-tie"></i> Atribuir Gerentes
+                                    </a>
+                                    <form action="{{ url_for('auth.delete_user', user_id=seller.id) }}" method="POST" class="d-inline">
+                                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                        <button type="submit" class="btn btn-sm btn-danger" onclick="return confirm('Tem certeza que deseja excluir este vendedor?');">
+                                            <i class="fas fa-trash"></i> Excluir
+                                        </button>
+                                    </form>
+                                    {% endif %}
+                                </div>
+                            </td>
+                        </tr>
+
+                        <!-- Modal para visualizar gerentes do vendedor -->
+                        <div class="modal fade" id="sellerManagersModal{{ seller.id }}" tabindex="-1" aria-labelledby="sellerManagersModalLabel{{ seller.id }}" aria-hidden="true">
+                            <div class="modal-dialog">
+                                <div class="modal-content">
+                                    <div class="modal-header bg-success text-white">
+                                        <h5 class="modal-title" id="sellerManagersModalLabel{{ seller.id }}">Gerentes de {{ seller.username }}</h5>
+                                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                                    </div>
+                                    <div class="modal-body">
+                                        {% if seller.managers.count() > 0 %}
+                                        <ul class="list-group">
+                                            {% for manager in seller.managers %}
+                                            <li class="list-group-item d-flex justify-content-between align-items-center">
+                                                {{ manager.username }}
+                                                <span class="badge bg-primary rounded-pill">{{ manager.email }}</span>
+                                                {% if current_user.is_admin() %}
+                                                <form action="{{ url_for('auth.unassign_manager', seller_id=seller.id) }}" method="POST" class="ms-2">
+                                                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                                    <input type="hidden" name="manager_id" value="{{ manager.id }}">
+                                                    <button type="submit" class="btn btn-sm btn-danger" onclick="return confirm('Tem certeza que deseja remover este gerente do vendedor?');">
+                                                        <i class="fas fa-times"></i>
+                                                    </button>
+                                                </form>
+                                                {% endif %}
+                                            </li>
+                                            {% endfor %}
+                                        </ul>
+                                        {% else %}
+                                        <div class="alert alert-info mb-0">
+                                            Este vendedor não possui gerentes atribuídos.
+                                        </div>
+                                        {% endif %}
+                                    </div>
+                                    <div class="modal-footer">
+                                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Fechar</button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% else %}
+            <div class="alert alert-info">
+                Nenhum vendedor cadastrado.
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}

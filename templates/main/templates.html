@@ -1,0 +1,91 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container mt-4">
+    <h2>Templates de Rotas</h2>
+
+    <div class="row">
+        {% for template in templates %}
+        <div class="col-md-4 mb-4">
+            <div class="card">
+                <div class="card-body">
+                    <h5 class="card-title">{{ template.name }}</h5>
+                    <p class="card-text">
+                        {{ template.description }}
+                        <br>
+                        <small class="text-muted">Criado em: {{ template.created_at.strftime('%d/%m/%Y') }}</small>
+                    </p>
+                    <div class="btn-group" role="group">
+                        <button onclick="createRouteFromTemplate({{ template.id }})" class="btn btn-primary">
+                            <i class="fas fa-plus"></i> Criar Rota
+                        </button>
+                        {% if current_user.is_admin() or template.creator_id == current_user.id %}
+                        <button onclick="deleteTemplate({{ template.id }})" class="btn btn-danger">
+                            <i class="fas fa-trash"></i> Excluir
+                        </button>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+
+    {% if not templates %}
+    <div class="alert alert-info">
+        <i class="fas fa-info-circle"></i> Nenhum template encontrado.
+    </div>
+    {% endif %}
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    function createRouteFromTemplate(templateId) {
+        if (confirm('Deseja criar uma nova rota a partir deste template?')) {
+            fetch(`/templates/${templateId}/create-route`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': '{{ csrf_token() }}'
+                }
+            })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        window.location.href = data.redirect_url;
+                    } else {
+                        alert(data.message);
+                    }
+                })
+                .catch(error => {
+                    console.error('Erro:', error);
+                    alert('Erro ao criar rota');
+                });
+        }
+    }
+
+    function deleteTemplate(templateId) {
+        if (confirm('Tem certeza que deseja excluir este template?')) {
+            fetch(`/templates/${templateId}/delete`, {
+                method: 'POST',
+                headers: {
+                    'X-CSRFToken': '{{ csrf_token() }}'
+                }
+            })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        location.reload();
+                    } else {
+                        alert(data.message);
+                    }
+                })
+                .catch(error => {
+                    console.error('Erro:', error);
+                    alert('Erro ao excluir template');
+                });
+        }
+    }
+</script>
+{% endblock %}

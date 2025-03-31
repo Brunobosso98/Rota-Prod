@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html lang="pt">
+
+<head>
+  <meta charset="utf-8">
+  <title>Resultado da Rota</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    }
+
+    body {
+      background-color: #f5f5f5;
+      color: #333;
+    }
+
+    h1 {
+      text-align: center;
+      padding: 20px;
+      background-color: #2c3e50;
+      color: white;
+      margin-bottom: 20px;
+    }
+
+    .container {
+      display: flex;
+      margin: 20px;
+      gap: 20px;
+      max-width: 1400px;
+      margin: 0 auto;
+      padding: 20px;
+    }
+
+    .route-list {
+      flex: 1;
+      background: white;
+      border-radius: 8px;
+      padding: 20px;
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    }
+
+    .route-info {
+      background-color: #f8f9fa;
+      padding: 15px;
+      border-radius: 6px;
+      margin-bottom: 20px;
+      border-left: 4px solid #2c3e50;
+    }
+
+    .route-info p {
+      margin: 10px 0;
+      font-size: 0.95em;
+      color: #2c3e50;
+    }
+
+    .points-list {
+      list-style-position: inside;
+      padding: 0;
+    }
+
+    .starting-point {
+      padding: 15px;
+      margin: 10px 0;
+      background-color: #e7f4e4;
+      border-radius: 6px;
+      border: 1px solid #b7d9a8;
+      transition: all 0.3s ease;
+    }
+
+    .starting-point:hover {
+      transform: translateX(5px);
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    }
+
+    .point-item {
+      padding: 15px;
+      margin: 10px 0;
+      background-color: #fff;
+      border-radius: 6px;
+      border: 1px solid #e9ecef;
+      transition: all 0.3s ease;
+    }
+
+    .point-item:hover {
+      transform: translateX(5px);
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    }
+
+    .point-name {
+      font-weight: 600;
+      color: #2c3e50;
+    }
+
+    .point-coords {
+      font-size: 0.85em;
+      color: #6c757d;
+      margin-top: 5px;
+    }
+
+    .map-container {
+      flex: 2;
+      height: 800px;
+      border-radius: 8px;
+      overflow: hidden;
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    }
+
+    .map-frame {
+      width: 100%;
+      height: 100%;
+      border: none;
+    }
+
+    .back-button {
+      display: block;
+      width: 100%;
+      padding: 10px;
+      margin-top: 20px;
+      background-color: #2c3e50;
+      color: white;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      text-align: center;
+      text-decoration: none;
+      transition: background-color 0.3s ease;
+    }
+
+    .back-button:hover {
+      background-color: #34495e;
+    }
+
+    .stats-badge {
+      display: inline-block;
+      padding: 5px 10px;
+      border-radius: 20px;
+      background-color: #2c3e50;
+      color: white;
+      font-size: 0.8em;
+      margin-right: 8px;
+    }
+
+    @media (max-width: 768px) {
+      .container {
+        flex-direction: column;
+      }
+
+      .map-container {
+        height: 400px;
+      }
+    }
+  </style>
+</head>
+
+<body>
+  <h1>Resultado da Rota Otimizada</h1>
+
+  <div class="container">
+    <div class="route-list">
+      <div class="route-info">
+        <h2>Informações da Rota</h2>
+        <p><strong>Ponto de Partida:</strong> ({{ "%.6f"|format(partida[0]) }}, {{ "%.6f"|format(partida[1]) }})</p>
+        <p><strong>Distância Total:</strong> {{ "%.2f"|format(distancia_total) }} km</p>
+        {% if tempo_estimado %}
+        <p><strong>Tempo Estimado:</strong> {{ "%.1f"|format(tempo_estimado) }} minutos ({{ "%.1f"|format(tempo_estimado/60) }} horas)</p>
+        {% endif %}
+        <p><strong>Total de paradas:</strong> {{ rota|length }}</p>
+        {% if osrm_disponivel %}
+        <p><span class="stats-badge">OSRM</span> Rota calculada com dados reais de estradas</p>
+        {% else %}
+        <p><span class="stats-badge">Básico</span> Rota calculada com distâncias em linha reta</p>
+        {% endif %}
+      </div>
+
+      <h2>Sequência de Visitas</h2>
+      <!-- Ponto de Partida -->
+      <div class="starting-point">
+        <div class="point-name"><strong>0. PONTO DE PARTIDA</strong></div>
+        <div class="point-coords">Coordenadas: ({{ "%.6f"|format(partida[0]) }}, {{ "%.6f"|format(partida[1]) }})</div>
+      </div>
+
+      <!-- Pontos da Rota -->
+      <ol class="points-list">
+        {% for ponto in rota %}
+        <li class="point-item">
+          <div class="point-name">{{ ponto.nome }} - {{ ponto.cidade }}</div>
+          <div class="point-coords">Coordenadas: ({{ "%.6f"|format(ponto.latitude) }}, {{ "%.6f"|format(ponto.longitude) }})</div>
+        </li>
+        {% endfor %}
+      </ol>
+
+      <!-- Não tem mais retorno ao ponto de partida - rota aberta -->
+
+      <a href="/" class="back-button">Voltar ao Início</a>
+    </div>
+
+    <div class="map-container">
+      <iframe src="{{ url_for('static', filename='route_map.html') }}" class="map-frame"></iframe>
+    </div>
+  </div>
+</body>
+
+</html>

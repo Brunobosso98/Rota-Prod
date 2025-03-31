@@ -1,0 +1,228 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="container-fluid">
+  <div class="d-sm-flex align-items-center justify-content-between mb-4">
+    <h1 class="h3 mb-0 text-gray-800">Estatísticas da Rota: {{ route.name }}</h1>
+  </div>
+
+  <!-- Cards Principais -->
+  <div class="row mb-4">
+    <!-- Card de Progresso -->
+    <div class="col-xl-3 col-md-6 mb-4">
+      <div class="card border-left-primary shadow h-100 py-2">
+        <div class="card-body">
+          <div class="row no-gutters align-items-center">
+            <div class="col mr-2">
+              <div class="text-xs font-weight-bold text-primary text-uppercase mb-1">Progresso da Rota</div>
+              <div class="row no-gutters align-items-center">
+                <div class="col-auto">
+                  <div class="h5 mb-0 mr-3 font-weight-bold text-gray-800">
+                    {% if route.total_points_count > 0 %}
+                    {{ (route.completed_points_count / route.total_points_count * 100)|round|int }}%
+                    {% else %}
+                    0%
+                    {% endif %}
+                  </div>
+                </div>
+                <div class="col">
+                  <div class="progress progress-sm mr-2">
+                    <div class="progress-bar bg-primary" role="progressbar" style="width: {% if route.total_points_count > 0 %}{{ (route.completed_points_count / route.total_points_count * 100)|round|int }}{% else %}0{% endif %}%"></div>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div class="col-auto">
+              <i class="fas fa-clipboard-list fa-2x text-gray-300"></i>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Card de Tempo Total de Trabalho -->
+    <div class="col-xl-3 col-md-6 mb-4">
+      <div class="card border-left-success shadow h-100 py-2">
+        <div class="card-body">
+          <div class="row no-gutters align-items-center">
+            <div class="col mr-2">
+              <div class="text-xs font-weight-bold text-success text-uppercase mb-1">Tempo Total de Trabalho</div>
+              <div class="h5 mb-0 font-weight-bold text-gray-800">{{ route.get_total_work_time() }} min</div>
+            </div>
+            <div class="col-auto">
+              <i class="fas fa-business-time fa-2x text-gray-300"></i>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Card de Tempo Médio -->
+    <div class="col-xl-3 col-md-6 mb-4">
+      <div class="card border-left-info shadow h-100 py-2">
+        <div class="card-body">
+          <div class="row no-gutters align-items-center">
+            <div class="col mr-2">
+              <div class="text-xs font-weight-bold text-info text-uppercase mb-1">Tempo Médio por Local</div>
+              <div class="h5 mb-0 font-weight-bold text-gray-800">{{ route.get_avg_work_time() }} min</div>
+            </div>
+            <div class="col-auto">
+              <i class="fas fa-clock fa-2x text-gray-300"></i>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Card de Distância Total -->
+    <div class="col-xl-3 col-md-6 mb-4">
+      <div class="card border-left-warning shadow h-100 py-2">
+        <div class="card-body">
+          <div class="row no-gutters align-items-center">
+            <div class="col mr-2">
+              <div class="text-xs font-weight-bold text-warning text-uppercase mb-1">Tempo Total de Deslocamento</div>
+              <div class="h5 mb-0 font-weight-bold text-gray-800">{{ route.get_total_transit_time() }} min</div>
+            </div>
+            <div class="col-auto">
+              <i class="fas fa-route fa-2x text-gray-300"></i>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Card de Distribuição de Tempo -->
+    <div class="col-xl-3 col-md-6 mb-4">
+      <div class="card border-left-dark shadow h-100 py-2">
+        <div class="card-body">
+          <div class="row no-gutters align-items-center">
+            <div class="col mr-2">
+              <div class="text-xs font-weight-bold text-dark text-uppercase mb-1">Distribuição do Tempo</div>
+              <div class="row no-gutters align-items-center">
+                <div class="col">
+                  {% set ratio = route.get_work_transit_ratio() %}
+                  <div class="progress" style="height: 20px;">
+                    <div class="progress-bar bg-success" role="progressbar" style="width: {{ ratio.work_percent }}%" title="Tempo em Trabalho">
+                      {{ ratio.work_percent }}%
+                    </div>
+                    <div class="progress-bar bg-warning" role="progressbar" style="width: {{ ratio.transit_percent }}%" title="Tempo em Deslocamento">
+                      {{ ratio.transit_percent }}%
+                    </div>
+                  </div>
+                  <div class="small mt-2">
+                    <span class="text-success">■ Trabalho</span>
+                    <span class="text-warning ml-2">■ Deslocamento</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div class="col-auto">
+              <i class="fas fa-chart-pie fa-2x text-gray-300"></i>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Tabela de Detalhes -->
+  <div class="card shadow mb-4">
+    <div class="card-header py-3">
+      <h6 class="m-0 font-weight-bold text-primary">Detalhes por Local</h6>
+    </div>
+    <div class="card-body">
+      <div class="table-responsive">
+        <table class="table table-bordered" width="100%" cellspacing="0">
+          <thead>
+            <tr>
+              <th>Ordem</th>
+              <th>Local</th>
+              <th>Check-in</th>
+              <th>Check-out</th>
+              <th>Tempo de Trabalho</th>
+              <th>Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for point in route.points|sort(attribute='order') %}
+            {% set location = route.route_locations|selectattr('location_id', 'equalto', point.location_id)|first %}
+            <tr>
+              <td>{{ point.order }}</td>
+              <td>
+                <strong>{{ point.name }}</strong><br>
+                <small class="text-muted">{{ point.city }} - {{ point.state }}</small>
+              </td>
+              <td>
+                {% if location.check_in_at %}
+                {{ location.check_in_at.strftime('%d/%m/%Y %H:%M') }}
+                {% else %}
+                -
+                {% endif %}
+              </td>
+              <td>
+                {% if location.check_out_at %}
+                {{ location.check_out_at.strftime('%d/%m/%Y %H:%M') }}
+                {% else %}
+                -
+                {% endif %}
+              </td>
+              <td>
+                {% if location.check_in_at and location.check_out_at %}
+                {{ location.get_work_time() }} min
+                {% else %}
+                -
+                {% endif %}
+              </td>
+              <td class="text-center">
+                {% if location.check_in_at and location.check_out_at %}
+                <span class="badge bg-success">Concluído</span>
+                {% elif location.check_in_at %}
+                <span class="badge bg-warning">Em Andamento</span>
+                {% else %}
+                <span class="badge bg-secondary">Pendente</span>
+                {% endif %}
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+  document.addEventListener('DOMContentLoaded', function () {
+    const ctx = document.getElementById('workTimeChart').getContext('2d');
+    const workTimeData = {
+      labels: [{% for loc in route.route_locations | sort(attribute = 'order') %}'{{ loc.location.name }}'{% if not loop.last %}, {% endif %} {% endfor %}],
+    datasets: [{
+      label: 'Tempo de Trabalho (min)',
+      data: [{% for loc in route.route_locations | sort(attribute = 'order') %}{{ loc.get_work_time() if loc.check_in_at and loc.check_out_at else 0 }}{% if not loop.last %}, {% endif %} {% endfor %}],
+  backgroundColor: 'rgba(78, 115, 223, 0.2)',
+    borderColor: 'rgba(78, 115, 223, 1)',
+      borderWidth: 1
+    }]
+  };
+
+  new Chart(ctx, {
+    type: 'bar',
+    data: workTimeData,
+    options: {
+      maintainAspectRatio: false,
+      scales: {
+        y: {
+          beginAtZero: true,
+          title: {
+            display: true,
+            text: 'Minutos'
+          }
+        }
+      }
+    }
+  });
+});
+</script>
+{% endblock %}

@@ -1,0 +1,269 @@
+{% extends "base.html" %}
+
+{% block title %}Locais{% endblock %}
+
+{% block extra_css %}
+<style>
+  .location-item {
+    transition: all 0.3s ease;
+    border-left: 4px solid transparent;
+  }
+
+  .location-item:hover {
+    background-color: rgba(0, 0, 0, 0.02);
+    border-left: 4px solid #007bff;
+  }
+
+  .action-buttons {
+    position: fixed;
+    bottom: 2rem;
+    right: 2rem;
+    z-index: 1000;
+  }
+
+  .import-modal .modal-content {
+    border-radius: 15px;
+  }
+
+  .location-form {
+    background: white;
+    padding: 2rem;
+    border-radius: 15px;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+  <div class="d-flex justify-content-between align-items-center mb-4">
+    <h1 class="h3 mb-0">Meus Locais</h1>
+    <div class="d-flex gap-2">
+      <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#importModal">
+        <i class="fas fa-file-import me-2"></i>Importar
+      </button>
+      <a href="{{ url_for('main.add_location') }}" class="btn btn-success">
+        <i class="fas fa-plus me-2"></i>Adicionar Local
+      </a>
+    </div>
+  </div>
+
+  <!-- Filtros -->
+  <div class="card shadow-sm mb-4">
+    <div class="card-header bg-light">
+      <h5 class="mb-0">Filtros</h5>
+    </div>
+    <div class="card-body">
+      <form action="{{ url_for('main.locations') }}" method="get" class="row g-3">
+        <div class="col-md-4">
+          <label for="state" class="form-label">Estado</label>
+          <select name="state" id="state" class="form-select">
+            <option value="">Todos os estados</option>
+            {% for state in states %}
+            <option value="{{ state }}" {% if state_filter==state %}selected{% endif %}>{{ state }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="col-md-4">
+          <label for="city" class="form-label">Cidade</label>
+          <select name="city" id="city" class="form-select">
+            <option value="">Todas as cidades</option>
+            {% for city in cities %}
+            <option value="{{ city }}" {% if city_filter==city %}selected{% endif %}>{{ city }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="col-md-4 d-flex align-items-end">
+          <button type="submit" class="btn btn-primary me-2">Filtrar</button>
+          <a href="{{ url_for('main.locations') }}" class="btn btn-outline-secondary">Limpar</a>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Locations List -->
+  <div class="card shadow-sm">
+    <div class="card-header bg-white">
+      <div class="row align-items-center">
+        <div class="col-md-6">
+          <h5 class="mb-0">Lista de Locais
+            {% if city_filter or state_filter %}
+            <span class="badge bg-info">
+              Filtrado:
+              {% if state_filter %}Estado: {{ state_filter }}{% endif %}
+              {% if city_filter %}Cidade: {{ city_filter }}{% endif %}
+            </span>
+            {% endif %}
+          </h5>
+        </div>
+        <div class="col-md-6">
+          <div class="input-group">
+            <input type="text" id="locationSearch" class="form-control" placeholder="Buscar local...">
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="card-body p-0">
+      {% if locations %}
+      <div class="table-responsive">
+        <table class="table table-hover align-middle mb-0">
+          <thead class="table-light">
+            <tr>
+              <th>Nome</th>
+              <th>Cidade/Estado</th>
+              <th>Telefone</th>
+              <th>Criado em</th>
+              <th>Ações</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for location in locations %}
+            <tr class="location-item">
+              <td class="fw-medium">{{ location.name }}</td>
+              <td>{{ location.city }}, {{ location.state }}</td>
+              <td>
+                <small class="text-muted">
+                  {% if location.telephone %}
+                  {{ location.telephone }}
+                  {% else %}
+                  <span class="text-secondary">Não informado</span>
+                  {% endif %}
+                </small>
+              </td>
+              <td>
+                <small class="text-muted">
+                  {{ location.created_at.strftime('%d/%m/%Y') }}
+                </small>
+              </td>
+              <td>
+                <div class="d-flex gap-1">
+                  <a href="{{ url_for('main.edit_location', location_id=location.id) }}" class="btn btn-sm btn-outline-primary">
+                    <i class="fas fa-edit"></i>
+                  </a>
+                  <button type="button" class="btn btn-sm btn-outline-danger delete-location" data-id="{{ location.id }}" data-name="{{ location.name }}">
+                    <i class="fas fa-trash"></i>
+                  </button>
+                  <a href="https://www.google.com/maps?q={{ location.latitude }},{{ location.longitude }}" target="_blank" class="btn btn-sm btn-outline-info">
+                    <i class="fas fa-map-marker-alt"></i>
+                  </a>
+                </div>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% else %}
+      <div class="p-4 text-center">
+        <div class="py-5">
+          <i class="fas fa-map-marker-alt fa-3x text-muted mb-3"></i>
+          <h5>Nenhum local encontrado</h5>
+          <p class="text-muted">Adicione novos locais ou ajuste os filtros de busca.</p>
+          <a href="{{ url_for('main.add_location') }}" class="btn btn-primary">Adicionar Local</a>
+        </div>
+      </div>
+      {% endif %}
+    </div>
+  </div>
+
+  <!-- Import Modal -->
+  <div class="modal fade import-modal" id="importModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title">Importar Locais</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body">
+          <div class="mb-4">
+            <h6>Importar do Excel</h6>
+            <p class="text-muted small">Faça upload de um arquivo Excel (.xlsx) com as colunas: nome, cidade, estado, latitude e longitude. Rua, número e telefone (opcional)</p>
+            <form action="{{ url_for('main.import_locations') }}" method="post" enctype="multipart/form-data">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+              <div class="input-group">
+                <input type="file" class="form-control" name="file" accept=".xlsx,.xls" required>
+                <button type="submit" class="btn btn-primary">Importar</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Action Buttons -->
+<div class="action-buttons">
+  <a href="{{ url_for('main.add_location') }}" class="btn btn-lg btn-primary rounded-circle shadow">
+    <i class="fas fa-plus"></i>
+  </a>
+</div>
+
+<script>
+  // Função para busca de locais na tabela
+  document.getElementById('locationSearch').addEventListener('keyup', function () {
+    const searchText = this.value.toLowerCase();
+    const tableRows = document.querySelectorAll('.location-item');
+
+    tableRows.forEach(row => {
+      const locationName = row.querySelector('td:first-child').textContent.toLowerCase();
+      const locationAddress = row.querySelector('td:nth-child(2)').textContent.toLowerCase();
+
+      if (locationName.includes(searchText) || locationAddress.includes(searchText)) {
+        row.style.display = '';
+      } else {
+        row.style.display = 'none';
+      }
+    });
+  });
+
+  // Atualizar cidades quando o estado é selecionado
+  document.getElementById('state').addEventListener('change', function () {
+    const state = this.value;
+    const citySelect = document.getElementById('city');
+
+    // Limpar opções atuais
+    citySelect.innerHTML = '<option value="">Todas as cidades</option>';
+
+    if (state) {
+      // Fazer requisição AJAX para obter cidades do estado
+      fetch(`/api/cities?state=${state}`)
+        .then(response => response.json())
+        .then(data => {
+          data.cities.forEach(city => {
+            const option = document.createElement('option');
+            option.value = city;
+            option.textContent = city;
+            citySelect.appendChild(option);
+          });
+        });
+    }
+  });
+
+  // Deletar local
+  document.querySelectorAll('.delete-location').forEach(button => {
+    button.addEventListener('click', function () {
+      const locationId = this.dataset.id;
+      const locationName = this.dataset.name;
+
+      if (confirm(`Tem certeza que deseja excluir o local "${locationName}"?`)) {
+        fetch(`{{ url_for('main.delete_location', location_id=0) }}`.replace('0', locationId), {
+          method: 'DELETE',
+          headers: {
+            'X-CSRFToken': '{{ csrf_token() }}'
+          }
+        })
+          .then(response => response.json())
+          .then(data => {
+            if (data.success) {
+              this.closest('tr').remove();
+              alert(`Local "${locationName}" excluído com sucesso!`);
+            } else {
+              alert(`Erro ao excluir local: ${data.message}`);
+            }
+          });
+      }
+    });
+  });
+</script>
+{% endblock %}

@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="pt">
+  <head>
+    <meta charset="utf-8">
+    <title>Otimizador de Rotas</title>
+  </head>
+  <body>
+    <h1>Otimizador de Rotas</h1>
+    <form action="/" method="post" enctype="multipart/form-data">
+      <div>
+        <label for="file">Selecione o arquivo Excel:</label>
+        <input type="file" name="file" id="file" accept=".xlsx,.xls" required>
+      </div>
+      <br>
+      <div>
+        <label for="start_coord">Coordenadas de partida (latitude, longitude):</label>
+        <input type="text" name="start_coord" id="start_coord" placeholder="-23.5505, -46.6333" required>
+      </div>
+      <br>
+      <button type="submit">Calcular Rota</button>
+    </form>
+  </body>
+</html>

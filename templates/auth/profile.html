@@ -1,0 +1,153 @@
+{% extends "base.html" %}
+
+{% block title %}Perfil - Otimizador de Rotas{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+  <div class="row">
+    <div class="col-md-12 mb-4">
+      <h2><i class="fas fa-user-circle me-2"></i>Perfil do Usuário</h2>
+      <hr>
+    </div>
+  </div>
+
+  <div class="row">
+    <div class="col-md-4">
+      <div class="card shadow mb-4">
+        <div class="card-header bg-primary text-white">
+          <h5 class="mb-0"><i class="fas fa-info-circle me-2"></i>Informações</h5>
+        </div>
+        <div class="card-body">
+          <div class="text-center mb-4">
+            <div class="avatar-circle mx-auto mb-3">
+              <span class="initials">{{ current_user.username[0] | upper }}</span>
+            </div>
+            <h4>{{ current_user.username }}</h4>
+            <p class="text-muted">{{ current_user.email }}</p>
+          </div>
+
+          <div class="mb-3">
+            <strong><i class="fas fa-calendar-alt me-2"></i>Membro desde:</strong>
+            <p>{{ current_user.created_at.strftime('%d/%m/%Y') }}</p>
+          </div>
+
+          <div class="mb-3">
+            <strong><i class="fas fa-route me-2"></i>Total de Rotas:</strong>
+            <p>{{ current_user.routes | length }}</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-md-8">
+      <div class="card shadow">
+        <div class="card-header bg-primary text-white">
+          <h5 class="mb-0"><i class="fas fa-edit me-2"></i>Editar Perfil</h5>
+        </div>
+        <div class="card-body">
+          <form method="POST" action="{{ url_for('auth.profile') }}">
+            {{ form.hidden_tag() }}
+
+            <div class="mb-3">
+              {{ form.username.label(class="form-label") }}
+              {{ form.username(class="form-control", value=current_user.username) }}
+              {% if form.username.errors %}
+              <div class="text-danger">
+                {% for error in form.username.errors %}
+                <small>{{ error }}</small>
+                {% endfor %}
+              </div>
+              {% endif %}
+            </div>
+
+            <div class="mb-3">
+              {{ form.email.label(class="form-label") }}
+              {{ form.email(class="form-control", value=current_user.email) }}
+              {% if form.email.errors %}
+              <div class="text-danger">
+                {% for error in form.email.errors %}
+                <small>{{ error }}</small>
+                {% endfor %}
+              </div>
+              {% endif %}
+            </div>
+
+            {% if current_user.company %}
+            <div class="mb-3">
+              {{ form.company_cnpj.label(class="form-label") }}
+              {{ form.company_cnpj(class="form-control", value=current_user.company.cnpj) }}
+            </div>
+            {% endif %}
+
+            <hr>
+            <h5 class="mb-3">Alterar Senha</h5>
+
+            <div class="mb-3">
+              {{ form.current_password.label(class="form-label") }}
+              {{ form.current_password(class="form-control") }}
+              {% if form.current_password.errors %}
+              <div class="text-danger">
+                {% for error in form.current_password.errors %}
+                <small>{{ error }}</small>
+                {% endfor %}
+              </div>
+              {% endif %}
+            </div>
+
+            <div class="mb-3">
+              {{ form.new_password.label(class="form-label") }}
+              {{ form.new_password(class="form-control") }}
+              {% if form.new_password.errors %}
+              <div class="text-danger">
+                {% for error in form.new_password.errors %}
+                <small>{{ error }}</small>
+                {% endfor %}
+              </div>
+              {% endif %}
+            </div>
+
+            <div class="mb-3">
+              {{ form.confirm_password.label(class="form-label") }}
+              {{ form.confirm_password(class="form-control") }}
+              {% if form.confirm_password.errors %}
+              <div class="text-danger">
+                {% for error in form.confirm_password.errors %}
+                <small>{{ error }}</small>
+                {% endfor %}
+              </div>
+              {% endif %}
+            </div>
+
+            <div class="d-grid gap-2">
+              {{ form.submit(class="btn btn-primary") }}
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_css %}
+<style>
+  .avatar-circle {
+    width: 100px;
+    height: 100px;
+    background-color: #0d6efd;
+    text-align: center;
+    border-radius: 50%;
+    -webkit-border-radius: 50%;
+    -moz-border-radius: 50%;
+  }
+
+  .initials {
+    position: relative;
+    top: 25px;
+    font-size: 50px;
+    line-height: 50px;
+    color: #fff;
+    font-weight: bold;
+  }
+</style>
+{% endblock %}

@@ -1,0 +1,654 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="container">
+    <h2>Criar Nova Rota</h2>
+    <form method="POST" id="createRouteForm" data-is-admin-or-manager="{% if current_user.is_admin() or current_user.is_manager() %}true{% else %}false{% endif %}">
+        {{ form.csrf_token }}
+
+        <div class="form-group mb-3">
+            {{ form.name.label }}
+            {{ form.name(class="form-control") }}
+            {% if form.name.errors %}
+            <div class="text-danger">
+                {% for error in form.name.errors %}
+                <span>{{ error }}</span>
+                {% endfor %}
+            </div>
+            {% endif %}
+        </div>
+
+        <div class="form-group mb-3">
+            {{ form.description.label }}
+            {{ form.description(class="form-control") }}
+        </div>
+
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5 class="mb-0">Ponto de Partida</h5>
+            </div>
+            <div class="card-body">
+                <div class="form-group">
+                    <label for="start_location_display">Selecione o ponto de partida</label>
+                    {{ form.start_location(id="start_location_hidden") }}
+                    <select id="start_location_display" class="form-control">
+                        <option value="">Selecione um ponto de partida</option>
+                        {% for location_id, location_name in form.locations.choices %}
+                        <option value="{{ location_id }}">{{ location_name }}</option>
+                        {% endfor %}
+                    </select>
+                    <small class="form-text text-muted">O ponto de partida será o primeiro ponto da rota</small>
+                </div>
+            </div>
+        </div>
+
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5 class="mb-0">Filtros de Locais</h5>
+            </div>
+            <div class="card-body">
+                <div class="row mb-3">
+                    <div class="col-md-6">
+                        <label for="state_filter_display">Estado</label>
+                        {{ form.state_filter(id="state_filter_hidden", style="display:none;") }}
+                        <select id="state_filter_display" class="form-control">
+                            <option value="">Todos</option>
+                            {% for state in form.state_filter.choices %}
+                            <option value="{{ state[0] }}">{{ state[1] }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="col-md-6">
+                        <label>Cidades</label>
+                        {{ form.city_filter(id="city_filter_hidden", style="display:none;") }}
+                        <div class="input-group mb-2">
+                            <input type="text" class="form-control" id="citySearchInput" placeholder="Buscar cidade...">
+                            <button class="btn btn-outline-secondary" type="button" id="clearCityFilter">Limpar</button>
+                        </div>
+                        <div class="cities-container border rounded p-2" style="max-height: 200px; overflow-y: auto;">
+                            <div id="citiesCheckboxContainer">
+                                <!-- As checkboxes serão preenchidas dinamicamente via JavaScript -->
+                                <div class="text-center py-2 text-muted">Selecione um estado para ver as cidades disponíveis</div>
+                            </div>
+                        </div>
+                        <div class="d-flex justify-content-between mt-1">
+                            <button type="button" class="btn btn-sm btn-outline-primary" id="selectAllCities">Selecionar Todas</button>
+                            <span class="badge bg-primary" id="selectedCitiesCount">0 selecionadas</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="form-group mb-3">
+            <label>Locais Disponíveis</label>
+            <div class="d-flex mb-2">
+                <button type="button" class="btn btn-sm btn-secondary me-2" id="selectAll">Selecionar Todos</button>
+                <button type="button" class="btn btn-sm btn-outline-secondary" id="deselectAll">Limpar Seleção</button>
+            </div>
+            <div class="mb-2" id="visibleLocationsCount"></div>
+            {{ form.locations(class="form-control", size=10, style="height: 250px;") }}
+            {% if form.locations.errors %}
+            <div class="text-danger">
+                {% for error in form.locations.errors %}
+                <span>{{ error }}</span>
+                {% endfor %}
+            </div>
+            {% endif %}
+        </div>
+
+        {% if current_user.is_admin() or current_user.is_manager() %}
+        <div class="form-group mb-3">
+            {{ form.sellers.label }}
+            {{ form.sellers(class="form-control", size=5) }}
+            <small class="form-text text-muted">Selecione os vendedores que terão acesso a esta rota</small>
+            {% if form.sellers.errors %}
+            <div class="text-danger">
+                {% for error in form.sellers.errors %}
+                <span>{{ error }}</span>
+                {% endfor %}
+            </div>
+            {% endif %}
+        </div>
+        {% endif %}
+
+        {% if current_user.is_admin() %}
+        <div class="form-group mb-3">
+            {{ form.managers.label }}
+            {{ form.managers(class="form-control", size=5) }}
+            <small class="form-text text-muted">Selecione os gerentes que terão acesso a esta rota</small>
+        </div>
+        {% endif %}
+
+        <button type="submit" class="btn btn-primary">Criar Rota</button>
+    </form>
+</div>
+
+<!-- Make sure Bootstrap JS is loaded -->
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+        // Variáveis de configuração
+        const isAdminOrManager = document.getElementById('createRouteForm').getAttribute('data-is-admin-or-manager') === 'true';
+
+        const stateFilterDisplay = document.getElementById('state_filter_display');
+        const stateFilterHidden = document.getElementById('state_filter_hidden');
+        const cityFilterHidden = document.getElementById('city_filter_hidden');
+        const locationsSelect = document.getElementById('locations');
+        const startLocationDisplay = document.getElementById('start_location_display');
+        const startLocationHidden = document.getElementById('start_location_hidden');
+        const selectAllBtn = document.getElementById('selectAll');
+        const deselectAllBtn = document.getElementById('deselectAll');
+        const createRouteForm = document.getElementById('createRouteForm');
+        const citySearchInput = document.getElementById('citySearchInput');
+        const citiesCheckboxContainer = document.getElementById('citiesCheckboxContainer');
+        const selectedCitiesCount = document.getElementById('selectedCitiesCount');
+        const selectAllCitiesBtn = document.getElementById('selectAllCities');
+        const clearCityFilterBtn = document.getElementById('clearCityFilter');
+
+        // Guardar todos os locais originais antes da filtragem
+        const allLocations = Array.from(locationsSelect.options).map(option => {
+            return {
+                value: option.value,
+                text: option.text,
+                selected: option.selected
+            };
+        });
+
+        // Função para atualizar o ponto de partida
+        function updateStartLocationOptions() {
+            // Salvar seleção atual
+            const currentSelection = startLocationHidden.value;
+
+            // Limpar opções existentes
+            startLocationDisplay.innerHTML = '';
+
+            // Adicionar opção vazia inicial
+            const emptyOption = document.createElement('option');
+            emptyOption.value = '';
+            emptyOption.textContent = 'Selecione um ponto de partida';
+            startLocationDisplay.appendChild(emptyOption);
+
+            // Obter todos os locais (para buscar o texto do ponto de partida selecionado)
+            const allLocationsMap = new Map(allLocations.map(loc => [loc.value, loc.text]));
+
+            // Obter apenas os locais visíveis (não filtrados)
+            const visibleLocations = Array.from(locationsSelect.options);
+            const visibleLocationIds = new Set(visibleLocations.map(opt => opt.value));
+
+            // Adicionar o ponto de partida selecionado primeiro, se houver
+            if (currentSelection) {
+                const selectedText = allLocationsMap.get(currentSelection);
+                if (selectedText) {
+                    const selectedOption = document.createElement('option');
+                    selectedOption.value = currentSelection;
+                    selectedOption.textContent = selectedText;
+                    startLocationDisplay.appendChild(selectedOption);
+                }
+            }
+
+            // Adicionar locais visíveis que *não* sejam o ponto de partida já adicionado
+            visibleLocations.forEach(option => {
+                if (option.value !== currentSelection) {
+                    const startOption = document.createElement('option');
+                    startOption.value = option.value;
+                    startOption.textContent = option.text;
+                    startLocationDisplay.appendChild(startOption);
+                }
+            });
+
+            // Definir o valor do campo visível (mesmo que já esteja definido)
+            startLocationDisplay.value = currentSelection;
+        }
+
+        // Função para atualizar o campo hidden com as cidades selecionadas
+        function updateSelectedCities() {
+            const selectedCities = [];
+
+            // Obter todas as checkboxes marcadas e adicionar seus valores ao array
+            document.querySelectorAll('.city-checkbox:checked').forEach(checkbox => {
+                const cityValue = checkbox.value.trim();
+                if (cityValue) {
+                    selectedCities.push(cityValue);
+                }
+            });
+
+            // Atualizar o campo hidden com a string de cidades separadas por vírgula
+            cityFilterHidden.value = selectedCities.join(',');
+
+            // Log para debug
+            console.log("updateSelectedCities - Cidades selecionadas:", selectedCities);
+            console.log("updateSelectedCities - Valor do campo hidden:", cityFilterHidden.value);
+
+            // Atualizar contador
+            updateSelectedCitiesCount();
+
+            // Preservar o ponto de partida atual
+            const previousStartLocation = startLocationHidden.value;
+
+            // Aplicar filtro com as cidades selecionadas
+            filterLocations(previousStartLocation);
+        }
+
+        // Adicionar o novo listener
+        function addCityCheckboxListener(checkbox) {
+            checkbox.addEventListener('change', function () {
+                const selectedCities = [];
+                document.querySelectorAll('.city-checkbox:checked').forEach(cb => {
+                    const cityValue = cb.value.trim();
+                    if (cityValue) {
+                        selectedCities.push(cityValue);
+                    }
+                });
+
+                // Atualizar o campo hidden diretamente
+                cityFilterHidden.value = selectedCities.join(',');
+
+                // Atualizar contador
+                updateSelectedCitiesCount();
+
+                // Preservar ponto de partida e aplicar filtro
+                const prevStartLoc = startLocationHidden.value;
+                filterLocations(prevStartLoc);
+            });
+        }
+
+        // Função para filtrar locais pela UF e cidade
+        function filterLocations(previousStartLocation = null) {
+            const selectedState = stateFilterDisplay.value;
+
+            // Pegar todas as checkboxes marcadas diretamente
+            const selectedCities = Array.from(document.querySelectorAll('.city-checkbox:checked'))
+                .map(checkbox => checkbox.value.trim())
+                .filter(city => city !== '');
+
+            // Atualizar o campo hidden com as cidades selecionadas
+            cityFilterHidden.value = selectedCities.join(',');
+
+            let visibleCount = 0;
+
+            console.log("Filtrando locais:", {
+                estado: selectedState,
+                cidades: selectedCities,
+                cidadesFiltro: cityFilterHidden.value
+            });
+
+            // Recriar as opções no select
+            locationsSelect.innerHTML = '';
+
+            // Adicionar apenas locais que passam no filtro
+            allLocations.forEach(loc => {
+                const parts = loc.text.split(' - ');
+
+                if (parts.length >= 3) {
+                    const city = parts[1].trim();
+                    const state = parts[2].trim();
+
+                    // Verificar correspondência de estado
+                    const stateMatch = !selectedState || state === selectedState;
+
+                    // Verificar correspondência de cidade (apenas se houver cidades selecionadas)
+                    const cityMatch = selectedCities.length === 0 || selectedCities.includes(city);
+
+                    if (stateMatch && cityMatch) {
+                        const option = document.createElement('option');
+                        option.value = loc.value;
+                        option.text = loc.text;
+                        option.selected = loc.selected;
+                        locationsSelect.appendChild(option);
+                        visibleCount++;
+                    }
+                }
+            });
+
+            // Atualizar contador de locais visíveis
+            document.getElementById('visibleLocationsCount').textContent =
+                `${visibleCount} de ${allLocations.length} locais disponíveis`;
+
+            // Atualizar opções do ponto de partida
+            updateStartLocationOptions();
+
+            // Restaurar ponto de partida anterior, se existir
+            if (previousStartLocation) {
+                startLocationHidden.value = previousStartLocation;
+                startLocationDisplay.value = previousStartLocation;
+            }
+        }
+
+        // Função para atualizar o contador de cidades selecionadas
+        function updateSelectedCitiesCount() {
+            const selectedCount = document.querySelectorAll('.city-checkbox:checked').length;
+            selectedCitiesCount.textContent = `${selectedCount} selecionadas`;
+        }
+
+        // Função para filtrar cidades pelo texto de busca
+        function filterCitiesBySearch(searchText) {
+            const searchLower = searchText.toLowerCase();
+            document.querySelectorAll('.city-check-item').forEach(item => {
+                const cityName = item.querySelector('label').textContent.trim().toLowerCase();
+                item.style.display = cityName.includes(searchLower) ? '' : 'none';
+            });
+        }
+
+        // Função para atualizar cidades baseado no estado selecionado
+        function updateCities(selectedState) {
+            // Obter as cidades que estavam selecionadas anteriormente
+            const previouslySelectedCities = cityFilterHidden.value
+                ? cityFilterHidden.value.split(',')
+                    .map(city => city.trim())
+                    .filter(city => city !== '')
+                : [];
+
+            console.log("Cidades previamente selecionadas:", previouslySelectedCities);
+
+            // Limpar o container de checkboxes de cidades
+            citiesCheckboxContainer.innerHTML = '';
+
+            // Se não há estado selecionado, mostrar mensagem e limpar o filtro
+            if (!selectedState) {
+                citiesCheckboxContainer.innerHTML = '<div class="text-center py-2 text-muted">Selecione um estado para ver as cidades disponíveis</div>';
+
+                // Limpar o filtro de cidades
+                cityFilterHidden.value = '';
+                updateSelectedCitiesCount();
+                return;
+            }
+
+            // Obter cidades do estado selecionado
+            const citiesInState = new Set();
+
+            allLocations.forEach(loc => {
+                const parts = loc.text.split(' - ');
+
+                if (parts.length >= 3) {
+                    const city = parts[1].trim();
+                    const state = parts[2].trim();
+
+                    if (state === selectedState) {
+                        citiesInState.add(city);
+                    }
+                }
+            });
+
+            // Se não houver cidades, mostrar mensagem
+            if (citiesInState.size === 0) {
+                citiesCheckboxContainer.innerHTML = '<div class="text-center py-2 text-muted">Nenhuma cidade encontrada para este estado</div>';
+                // Limpar o filtro de cidades
+                cityFilterHidden.value = '';
+                updateSelectedCitiesCount();
+                return;
+            }
+
+            // Adicionar checkboxes para cada cidade
+            let index = 0;
+            // Converter para array, ordenar e garantir que não há duplicatas
+            const citiesSorted = Array.from(citiesInState).sort();
+
+            citiesSorted.forEach(city => {
+                const cityItem = document.createElement('div');
+                cityItem.className = 'form-check city-check-item mb-2';
+
+                const cityCheckbox = document.createElement('input');
+                cityCheckbox.className = 'form-check-input city-checkbox';
+                cityCheckbox.type = 'checkbox';
+                cityCheckbox.value = city;
+                cityCheckbox.id = 'city' + (++index);
+
+                // Verificar se a cidade estava previamente selecionada
+                if (previouslySelectedCities.includes(city)) {
+                    cityCheckbox.checked = true;
+                }
+
+                const cityLabel = document.createElement('label');
+                cityLabel.className = 'form-check-label';
+                cityLabel.htmlFor = 'city' + index;
+                cityLabel.textContent = city;
+
+                // Adicionar o novo listener
+                addCityCheckboxListener(cityCheckbox);
+
+                cityItem.appendChild(cityCheckbox);
+                cityItem.appendChild(cityLabel);
+                citiesCheckboxContainer.appendChild(cityItem);
+            });
+
+            // Atualizar contador
+            updateSelectedCitiesCount();
+
+            // Coletar todas as cidades selecionadas
+            const selectedCities = [];
+            document.querySelectorAll('.city-checkbox:checked').forEach(checkbox => {
+                const cityValue = checkbox.value.trim();
+                if (cityValue) {
+                    selectedCities.push(cityValue);
+                }
+            });
+
+            // Atualizar o campo hidden com a lista de cidades selecionadas
+            cityFilterHidden.value = selectedCities.join(',');
+
+            console.log("updateCities - Cidades marcadas após atualização:", selectedCities);
+            console.log("updateCities - Valor final do campo hidden:", cityFilterHidden.value);
+        }
+
+        // Sincronizar valores entre campos visíveis e ocultos
+        startLocationDisplay.addEventListener('change', function () {
+            startLocationHidden.value = this.value;
+        });
+
+        // Evento de mudança no filtro de estado
+        stateFilterDisplay.addEventListener('change', function () {
+            // Preservar ponto de partida atual
+            const previousStartLocation = startLocationHidden.value;
+
+            // Preservar cidades selecionadas para potencial uso posterior
+            const previousCities = cityFilterHidden.value;
+
+            // Atualizar campo hidden
+            stateFilterHidden.value = this.value;
+
+            // Não limpar o filtro de cidades automaticamente
+            // A função updateCities vai cuidar disso se necessário
+
+            // Atualizar lista de cidades baseado no estado selecionado
+            updateCities(this.value);
+
+            // Aplicar filtro nos locais após a atualização das cidades
+            // O valor correto de cityFilterHidden já foi atualizado em updateCities
+            filterLocations(previousStartLocation);
+
+            // Exibir mensagem no console
+            console.log("Estado alterado para:", this.value, "- Cidades selecionadas:", cityFilterHidden.value);
+        });
+
+        // Evento de busca de cidades
+        if (citySearchInput) {
+            citySearchInput.addEventListener('input', function () {
+                filterCitiesBySearch(this.value);
+            });
+        }
+
+        // Botão para selecionar todas as cidades visíveis
+        if (selectAllCitiesBtn) {
+            selectAllCitiesBtn.addEventListener('click', function () {
+                // Selecionar todas as checkboxes de cidades visíveis
+                document.querySelectorAll('.city-check-item:not([style*="display: none"]) .city-checkbox').forEach(checkbox => {
+                    checkbox.checked = true;
+                });
+
+                // Coletar todas as cidades selecionadas
+                const selectedCities = [];
+                document.querySelectorAll('.city-checkbox:checked').forEach(checkbox => {
+                    const cityValue = checkbox.value.trim();
+                    if (cityValue) {
+                        selectedCities.push(cityValue);
+                    }
+                });
+
+                // Atualizar o campo hidden diretamente
+                cityFilterHidden.value = selectedCities.join(',');
+
+                console.log("Selecionar Todas - Cidades selecionadas:", selectedCities);
+                console.log("Selecionar Todas - Campo hidden atualizado:", cityFilterHidden.value);
+
+                // Atualizar contador
+                updateSelectedCitiesCount();
+
+                // Preservar o ponto de partida atual e aplicar filtro
+                const previousStartLocation = startLocationHidden.value;
+                filterLocations(previousStartLocation);
+            });
+        }
+
+        // Botão para limpar filtro de cidades
+        if (clearCityFilterBtn) {
+            clearCityFilterBtn.addEventListener('click', function () {
+                // Limpar o campo de busca
+                if (citySearchInput) {
+                    citySearchInput.value = '';
+                }
+
+                // Mostrar todas as cidades removendo qualquer filtro de exibição
+                document.querySelectorAll('.city-check-item').forEach(item => {
+                    item.style.display = '';
+                });
+
+                // Desmarcar todas as checkboxes de cidades
+                document.querySelectorAll('.city-checkbox').forEach(checkbox => {
+                    checkbox.checked = false;
+                });
+
+                // Limpar explicitamente o campo hidden
+                cityFilterHidden.value = '';
+
+                console.log("clearCityFilter - Campo hidden limpo:", cityFilterHidden.value);
+
+                // Atualizar o contador de cidades selecionadas
+                updateSelectedCitiesCount();
+
+                // Preservar o ponto de partida atual e aplicar o filtro
+                const previousStartLocation = startLocationHidden.value;
+                filterLocations(previousStartLocation);
+            });
+        }
+
+        // Botões para selecionar/deselecionar todos os locais
+        selectAllBtn.addEventListener('click', function () {
+            // Selecionar apenas os locais visíveis (atual na lista após filtro)
+            Array.from(locationsSelect.options).forEach(option => {
+                option.selected = true;
+            });
+            updateStartLocationOptions();
+        });
+
+        deselectAllBtn.addEventListener('click', function () {
+            Array.from(locationsSelect.options).forEach(option => {
+                option.selected = false;
+            });
+            updateStartLocationOptions();
+        });
+
+        // Monitorar mudanças na seleção de locais para atualizar o ponto de partida
+        locationsSelect.addEventListener('change', function () {
+            // Atualizar o estado "selected" nos locais originais
+            Array.from(locationsSelect.options).forEach(option => {
+                const originalIndex = allLocations.findIndex(loc => loc.value === option.value);
+                if (originalIndex >= 0) {
+                    allLocations[originalIndex].selected = option.selected;
+                }
+            });
+
+            updateStartLocationOptions();
+        });
+
+        // Verificar antes de enviar o formulário
+        createRouteForm.addEventListener('submit', function (e) {
+            e.preventDefault(); // Impedir envio automático do formulário
+
+            // Verificar se há locais selecionados
+            const selectedLocations = Array.from(locationsSelect.selectedOptions);
+            if (selectedLocations.length === 0) {
+                alert('Por favor, selecione pelo menos um local para a rota.');
+                return;
+            }
+
+            // Verificar se há vendedores selecionados (apenas para admin/gerente)
+            if (isAdminOrManager) {
+                const sellersSelect = document.getElementById('sellers');
+                if (sellersSelect) {
+                    const selectedSellers = Array.from(sellersSelect.selectedOptions);
+                    if (selectedSellers.length === 0) {
+                        alert('Por favor, selecione pelo menos um vendedor para a rota.');
+                        return;
+                    }
+                }
+            }
+
+            // Se o ponto de partida não estiver definido, definir como o primeiro local selecionado
+            if (!startLocationHidden.value && selectedLocations.length > 0) {
+                startLocationHidden.value = selectedLocations[0].value;
+            }
+
+            // Garantir que os campos ocultos estejam preenchidos com os valores corretos
+            stateFilterHidden.value = stateFilterDisplay.value;
+
+            // Verificar novamente se o campo de cidades está correto
+            const selectedCities = [];
+            document.querySelectorAll('.city-checkbox:checked').forEach(checkbox => {
+                const cityValue = checkbox.value.trim();
+                if (cityValue) {
+                    selectedCities.push(cityValue);
+                }
+            });
+            cityFilterHidden.value = selectedCities.join(',');
+
+            console.log("Enviando formulário com:", {
+                estado: stateFilterHidden.value,
+                cidades: cityFilterHidden.value,
+                pontoPartida: startLocationHidden.value,
+                locais: selectedLocations.length
+            });
+
+            // Tudo ok, enviar o formulário
+            this.submit();
+        });
+
+        // Inicialização
+        // Inicializar contagem de locais visíveis
+        document.getElementById('visibleLocationsCount').textContent =
+            `${locationsSelect.options.length} de ${allLocations.length} locais disponíveis`;
+
+        // Inicializar opções do ponto de partida
+        updateStartLocationOptions();
+
+        // Inicializar cidades se um estado estiver selecionado
+        const initialState = stateFilterDisplay.value;
+        if (initialState) {
+            updateCities(initialState);
+
+            // Verificação extra: garantir que o campo hidden esteja inicializado corretamente
+            setTimeout(() => {
+                const selectedCities = [];
+                document.querySelectorAll('.city-checkbox:checked').forEach(checkbox => {
+                    const cityValue = checkbox.value.trim();
+                    if (cityValue) {
+                        selectedCities.push(cityValue);
+                    }
+                });
+
+                // Atualizar o campo hidden diretamente se necessário
+                if (cityFilterHidden.value !== selectedCities.join(',')) {
+                    cityFilterHidden.value = selectedCities.join(',');
+                    console.log("Inicialização - Campo hidden ajustado:", cityFilterHidden.value);
+                }
+            }, 100);
+        }
+
+        console.log("Inicialização completa - Campos configurados:", {
+            estado: stateFilterDisplay.value,
+            cidades: cityFilterHidden.value,
+            locaisVisiveis: locationsSelect.options.length
+        });
+    });
+</script>
+{% endblock %}
