@@ -216,10 +216,6 @@
             // Atualizar o campo hidden com a string de cidades separadas por vírgula
             cityFilterHidden.value = selectedCities.join(',');
 
-            // Log para debug
-            console.log("updateSelectedCities - Cidades selecionadas:", selectedCities);
-            console.log("updateSelectedCities - Valor do campo hidden:", cityFilterHidden.value);
-
             // Atualizar contador
             updateSelectedCitiesCount();
 
@@ -266,12 +262,6 @@
             cityFilterHidden.value = selectedCities.join(',');
 
             let visibleCount = 0;
-
-            console.log("Filtrando locais:", {
-                estado: selectedState,
-                cidades: selectedCities,
-                cidadesFiltro: cityFilterHidden.value
-            });
 
             // Recriar as opções no select
             locationsSelect.innerHTML = '';
@@ -339,7 +329,6 @@
                     .filter(city => city !== '')
                 : [];
 
-            console.log("Cidades previamente selecionadas:", previouslySelectedCities);
 
             // Limpar o container de checkboxes de cidades
             citiesCheckboxContainer.innerHTML = '';
@@ -427,8 +416,6 @@
             // Atualizar o campo hidden com a lista de cidades selecionadas
             cityFilterHidden.value = selectedCities.join(',');
 
-            console.log("updateCities - Cidades marcadas após atualização:", selectedCities);
-            console.log("updateCities - Valor final do campo hidden:", cityFilterHidden.value);
         }
 
         // Sincronizar valores entre campos visíveis e ocultos
@@ -457,8 +444,6 @@
             // O valor correto de cityFilterHidden já foi atualizado em updateCities
             filterLocations(previousStartLocation);
 
-            // Exibir mensagem no console
-            console.log("Estado alterado para:", this.value, "- Cidades selecionadas:", cityFilterHidden.value);
         });
 
         // Evento de busca de cidades
@@ -487,9 +472,6 @@
 
                 // Atualizar o campo hidden diretamente
                 cityFilterHidden.value = selectedCities.join(',');
-
-                console.log("Selecionar Todas - Cidades selecionadas:", selectedCities);
-                console.log("Selecionar Todas - Campo hidden atualizado:", cityFilterHidden.value);
 
                 // Atualizar contador
                 updateSelectedCitiesCount();
@@ -520,8 +502,6 @@
 
                 // Limpar explicitamente o campo hidden
                 cityFilterHidden.value = '';
-
-                console.log("clearCityFilter - Campo hidden limpo:", cityFilterHidden.value);
 
                 // Atualizar o contador de cidades selecionadas
                 updateSelectedCitiesCount();
@@ -602,13 +582,6 @@
             });
             cityFilterHidden.value = selectedCities.join(',');
 
-            console.log("Enviando formulário com:", {
-                estado: stateFilterHidden.value,
-                cidades: cityFilterHidden.value,
-                pontoPartida: startLocationHidden.value,
-                locais: selectedLocations.length
-            });
-
             // Tudo ok, enviar o formulário
             this.submit();
         });
@@ -639,16 +612,10 @@
                 // Atualizar o campo hidden diretamente se necessário
                 if (cityFilterHidden.value !== selectedCities.join(',')) {
                     cityFilterHidden.value = selectedCities.join(',');
-                    console.log("Inicialização - Campo hidden ajustado:", cityFilterHidden.value);
                 }
             }, 100);
         }
 
-        console.log("Inicialização completa - Campos configurados:", {
-            estado: stateFilterDisplay.value,
-            cidades: cityFilterHidden.value,
-            locaisVisiveis: locationsSelect.options.length
-        });
     });
 </script>
 {% endblock %}
