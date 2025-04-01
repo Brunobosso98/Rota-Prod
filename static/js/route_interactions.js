@@ -612,7 +612,7 @@ $(document).ready(function () {
           // Recarregar a página para obter um novo token CSRF
           setTimeout(function () {
             location.reload();
-          }, 2000);
+          }, 4000);
         } else if (xhr.responseJSON && xhr.responseJSON.message) {
           errorMsg = xhr.responseJSON.message;
         } else if (status === 'error' && error === '') {
