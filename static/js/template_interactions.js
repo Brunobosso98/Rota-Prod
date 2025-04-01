@@ -18,10 +18,10 @@ async function loadTemplatePoints(templateId) {
     data.points.forEach((point) => {
       pointsList.innerHTML += `
                 <tr data-point-id="${point.id}" data-order="${point.order}">
-                    <td>${point.order}</td>
+                    <td class="d-none d-md-table-cell">${point.order}</td>
                     <td>${point.name}</td>
                     <td>${point.city}</td>
-                    <td>${point.state}</td>
+                    <td class="d-none d-md-table-cell">${point.state}</td>
                     <td>
                         ${
                           point.order === 0

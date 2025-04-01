@@ -16,8 +16,6 @@ $(document).ready(function () {
     $('meta[name="csrf-token"]').attr('content') ||
     $('input[name="csrf_token"]').val();
 
-  console.log('CSRF Token disponível:', !!csrfToken);
-
   // Obter dados da rota do elemento data
   const routeDataElement = document.getElementById('route-data');
   if (!routeDataElement) {
@@ -79,8 +77,6 @@ $(document).ready(function () {
     const latitude = $(this).data('lat');
     const longitude = $(this).data('lon');
 
-    console.log('Check-in button clicked', { locationId, latitude, longitude });
-
     // Verificar se geolocalização está disponível
     if (!isGeoAvailable) {
       toastr.error(
@@ -94,8 +90,6 @@ $(document).ready(function () {
       function (position) {
         const userLat = position.coords.latitude;
         const userLon = position.coords.longitude;
-
-        console.log('User position obtained', { userLat, userLon });
 
         // Enviar requisição para check-in
         sendCheckInRequest(locationId, userLat, userLon);
@@ -117,7 +111,6 @@ $(document).ready(function () {
   // Gerenciar check-out
   $('.check-out-btn').on('click', function () {
     const locationId = $(this).data('location-id');
-    console.log('Check-out button clicked', { locationId });
 
     sendCheckOutRequest(locationId);
   });
@@ -127,12 +120,6 @@ $(document).ready(function () {
     const locationId = $(this).data('location-id');
     const latitude = $(this).data('lat');
     const longitude = $(this).data('lon');
-
-    console.log('Toggle visited button clicked', {
-      locationId,
-      latitude,
-      longitude,
-    });
 
     // Verificar se geolocalização está disponível
     if (!isGeoAvailable) {
@@ -147,8 +134,6 @@ $(document).ready(function () {
       function (position) {
         const userLat = position.coords.latitude;
         const userLon = position.coords.longitude;
-
-        console.log('User position obtained for toggle', { userLat, userLon });
 
         // Calcular distância
         const distance = haversineDistance(
@@ -192,7 +177,6 @@ $(document).ready(function () {
   // Event handler para o botão DENTRO do modal de otimização
   $('#optimizeRouteForm').on('submit', function (e) {
     //e.preventDefault();
-    console.log('Form submitted!'); // Debugging
     const routeId = getRouteId();
     if (routeId) {
       // Get the value of the return to start checkbox
@@ -209,7 +193,7 @@ $(document).ready(function () {
       // Recarrega a página após 2 segundos
       setTimeout(function () {
         window.location.reload();
-      }, 2000);
+      }, 4000);
     } else {
       toastr.error('ID da rota não encontrado');
     }
@@ -295,7 +279,7 @@ $(document).ready(function () {
     // Forçar o recarregamento da página
     setTimeout(() => {
       window.location.reload();
-    }, 2000);
+    }, 4000);
   });
 
   // Salvar ponto de partida manual
@@ -323,15 +307,6 @@ $(document).ready(function () {
       $('meta[name="csrf-token"]').attr('content') ||
       $('input[name="csrf_token"]').val();
 
-    // Exibir dados antes do envio para debug
-    console.log('Enviando requisição de check-in para:', {
-      locationId,
-      userLat,
-      userLon,
-      csrfToken: csrfToken ? csrfToken.substring(0, 10) + '...' : 'null',
-      routeId: routeId, // Garantir que routeId está disponível
-    });
-
     // Verificar se temos o ID da rota
     if (!routeId) {
       toastr.error('ID da rota não encontrado');
@@ -348,7 +323,6 @@ $(document).ready(function () {
 
     // Usar URL relativa para evitar problemas de domínio/porta
     const url = `/routes/${routeId}/locations/${locationId}/check-in`;
-    console.log('URL da requisição:', url);
 
     $.ajax({
       url: url,
@@ -363,8 +337,6 @@ $(document).ready(function () {
         'X-CSRFToken': csrfToken,
       },
       success: function (response) {
-        console.log('Check-in response:', response);
-
         if (response.success) {
           toastr.success('Check-in realizado com sucesso!');
           // Recarregar a página para atualizar os dados
@@ -383,7 +355,6 @@ $(document).ready(function () {
         if (xhr.status === 403) {
           errorMsg =
             'Erro de autenticação. Tente recarregar a página e fazer login novamente.';
-          console.log('Token CSRF inválido ou expirado, recarregando...');
           // Recarregar a página para obter um novo token CSRF
           setTimeout(function () {
             location.reload();
@@ -477,7 +448,6 @@ $(document).ready(function () {
 
     // Usar URL relativa para evitar problemas de domínio/porta
     const url = `/routes/${routeId}/route_points/${locationId}/toggle-visited`;
-    console.log('Enviando requisição para alternar status:', url);
 
     $.ajax({
       url: url,
@@ -490,8 +460,6 @@ $(document).ready(function () {
         'X-CSRFToken': csrfToken,
       },
       success: function (response) {
-        console.log('Toggle visited response:', response);
-
         if (response.success) {
           toastr.success('Status de visita alterado com sucesso!');
           // Recarregar a página para atualizar os dados
@@ -510,7 +478,6 @@ $(document).ready(function () {
         if (xhr.status === 403) {
           errorMsg =
             'Erro de autenticação. Tente recarregar a página e fazer login novamente.';
-          console.log('Token CSRF inválido ou expirado, recarregando...');
           // Recarregar a página para obter um novo token CSRF
           setTimeout(function () {
             location.reload();
@@ -529,8 +496,6 @@ $(document).ready(function () {
 
   // Função para otimizar a rota
   function optimizeRoute(routeId, returnToStart) {
-    // Add returnToStart as a parameter
-    console.log('optimizeRoute function called'); // Debugging
     // Obter o token CSRF novamente para garantir que está atualizado
     const csrfToken =
       $('meta[name="csrf-token"]').attr('content') ||
@@ -550,12 +515,6 @@ $(document).ready(function () {
       csrf_token: csrfToken,
       return_to_start: returnToStart, // Enviar o valor do checkbox
     };
-    console.log('Enviando requisição para otimizar rota:', url);
-    console.log('Dados da requisição:', JSON.stringify(requestData)); // Log detalhado dos dados
-    console.log(
-      'CSRF Token:',
-      csrfToken ? csrfToken.substring(0, 10) + '...' : 'null',
-    ); // Log do token
 
     // Desabilitar o botão de otimização e atualizar seu texto
     $('#optimizeBtn')
@@ -650,7 +609,6 @@ $(document).ready(function () {
         if (xhr.status === 403) {
           errorMsg =
             'Erro de autenticação. Tente recarregar a página e fazer login novamente.';
-          console.log('Token CSRF inválido ou expirado, recarregando...');
           // Recarregar a página para obter um novo token CSRF
           setTimeout(function () {
             location.reload();
@@ -716,7 +674,6 @@ $(document).ready(function () {
 
     // Usar URL relativa para evitar problemas de domínio/porta
     const url = `/routes/${routeId}/change-starting-point`;
-    console.log('Enviando requisição para alterar ponto de partida:', url);
 
     $.ajax({
       url: url,
@@ -734,8 +691,6 @@ $(document).ready(function () {
         'X-CSRFToken': csrfToken,
       },
       success: function (response) {
-        console.log('Save starting point response:', response);
-
         if (response.success) {
           toastr.success('Ponto de partida alterado com sucesso!');
 
@@ -765,7 +720,6 @@ $(document).ready(function () {
         if (xhr.status === 403) {
           errorMsg =
             'Erro de autenticação. Tente recarregar a página e fazer login novamente.';
-          console.log('Token CSRF inválido ou expirado, recarregando...');
           // Recarregar a página para obter um novo token CSRF
           setTimeout(function () {
             location.reload();
