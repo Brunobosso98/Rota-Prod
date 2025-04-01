@@ -513,6 +513,15 @@
                                 </label>
                             </div>
 
+                            {# Add the return to start checkbox for Geolocation #}
+                            <div class="form-check mb-3">
+                                <input class="form-check-input" type="checkbox" id="geo-return-to-start">
+                                <label class="form-check-label" for="geo-return-to-start">
+                                    Retornar ao Ponto de Partida (Rota Circular)
+                                </label>
+                                <small class="form-text text-muted d-block">Marque se a rota otimizada deve terminar no ponto inicial.</small>
+                            </div>
+
                             <button type="button" class="btn btn-success" id="geo-save-btn" disabled>
                                 <i class="fas fa-save"></i> Salvar Como Ponto de Partida
                             </button>
@@ -542,6 +551,15 @@
                             <label class="form-check-label" for="manual-optimize">
                                 Otimizar rota após alterar o ponto de partida
                             </label>
+                        </div>
+
+                        {# Add the return to start checkbox for Manual #}
+                        <div class="form-check mb-3">
+                            <input class="form-check-input" type="checkbox" id="manual-return-to-start">
+                            <label class="form-check-label" for="manual-return-to-start">
+                                Retornar ao Ponto de Partida (Rota Circular)
+                            </label>
+                            <small class="form-text text-muted d-block">Marque se a rota otimizada deve terminar no ponto inicial.</small>
                         </div>
 
                         <button type="button" class="btn btn-success" id="manual-save-btn">

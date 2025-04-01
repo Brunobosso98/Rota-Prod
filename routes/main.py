@@ -1037,34 +1037,44 @@ def optimize_route(route_id):
         if route.is_completed:
             return jsonify({'success': False, 'message': 'Esta rota já foi concluída e não pode ser otimizada'}), 400
             
-            # Marcar rota como sendo otimizada
-            route.optimization_status = 'optimizing'
-            db.session.commit()
+        # --- Optimization logic moved outside the 'if' block ---
+        # Marcar rota como sendo otimizada
+        route.optimization_status = 'optimizing'
+        db.session.commit()
 
-            # Obter a aplicação Flask atual para usar no contexto da thread
-            app_context = current_app._get_current_object()
+        # Obter a aplicação Flask atual para usar no contexto da thread
+        app_context = current_app._get_current_object()
 
-            # Iniciar a otimização em uma thread separada
-            thread = Thread(target=process_route_optimization, args=(route.id, app_context))
-            thread.daemon = True  # Permite que a aplicação saia mesmo se a thread estiver rodando
-            thread.start()
+        # Iniciar a otimização em uma thread separada
+        # TODO: Passar 'return_to_start' para process_route_optimization se necessário
+        return_to_start = data.get('return_to_start', False) # Get value from request
+        thread = Thread(target=process_route_optimization, args=(route.id, app_context, return_to_start)) # Pass return_to_start
+        thread.daemon = True  # Permite que a aplicação saia mesmo se a thread estiver rodando
+        thread.start()
 
-            # Retornar imediatamente para o usuário
-            return jsonify({
-                'success': True,
-                'message': 'Otimização da rota iniciada em segundo plano.',
-                'status': 'optimizing'
-            })
+        # Retornar imediatamente para o usuário
+        return jsonify({
+            'success': True,
+            'message': 'Otimização da rota iniciada em segundo plano.',
+            'status': 'optimizing'
+        })
 
     except Exception as e:
-        # Se ocorrer um erro antes de iniciar a thread, reverter o status
+        # Se ocorrer um erro ANTES de iniciar a thread ou durante as verificações, reverter o status
         if route and route.optimization_status == 'optimizing':
-            route.optimization_status = 'failed' # Ou 'not_optimized' dependendo da lógica desejada
-            db.session.commit()
+            # Verificar se 'route' foi definido antes de tentar acessá-lo
+            if 'route' in locals() and route and route.optimization_status == 'optimizing':
+                route.optimization_status = 'failed' # Ou 'not_optimized' dependendo da lógica desejada
+                db.session.commit()
         print(f"Erro geral na rota /optimize: {str(e)}")
         import traceback
         print(traceback.format_exc())
         return jsonify({'success': False, 'message': f'Erro ao iniciar otimização: {str(e)}'}), 500
+
+    # Fallback return statement in case something unexpected happens
+    print("ERROR: optimize_route function reached end without returning!")
+    from flask import make_response
+    return make_response("Internal Server Error: Unexpected code path in optimize_route.", 500)
 
 @main.route('/route/<int:route_id>/edit', methods=['GET', 'POST'])
 @login_required
@@ -1407,6 +1417,9 @@ def change_starting_point(route_id):
         latitude = data.get('latitude')
         longitude = data.get('longitude')
         point_name = data.get('name', 'Ponto de Partida')
+        # Get optimize and return_to_start flags from JSON
+        should_optimize = data.get('optimize', False)
+        return_to_start = data.get('return_to_start', False) 
         
         if latitude is None or longitude is None:
             return jsonify({
@@ -1448,19 +1461,16 @@ def change_starting_point(route_id):
         
         db.session.commit()
         
-        # Verificar se deve otimizar (sempre respeitando a opção do usuário)
-        should_optimize = data.get('optimize', False)
-        
         # Se deve otimizar, iniciar otimização
         if should_optimize:
-            # Iniciar otimização da rota
+            # Iniciar otimização da rota (should_optimize already read above)
             route.mark_as_optimizing()
             
             # Obter a aplicação Flask atual para usar no contexto
             app = current_app._get_current_object()
             
-            # Iniciar otimização em processo separado
-            thread = Thread(target=process_route_optimization, args=(route.id, app))
+            # Iniciar otimização em processo separado, passing return_to_start
+            thread = Thread(target=process_route_optimization, args=(route.id, app, return_to_start))
             thread.daemon = True
             thread.start()
             
@@ -1654,7 +1664,7 @@ def location_check_out(route_id, location_id):
 
         return jsonify({'success': False, 'message': f'Erro ao processar check-out: {str(e)}'}), 500
 
-def process_route_optimization(route_id, app):
+def process_route_optimization(route_id, app, return_to_start=False): # Add return_to_start parameter
     """
     Função para processar a otimização da rota em background
     """
@@ -1687,10 +1697,10 @@ def process_route_optimization(route_id, app):
 
             # Importar função de otimização
             from appReta import optimize_route as app_optimize_route
-            
-            # Executar otimização
-            optimization_result = app_optimize_route(points_for_optimization, starting_point)
-            
+
+            # Executar otimização, passando return_to_start
+            optimization_result = app_optimize_route(points_for_optimization, starting_point, return_to_start)
+
             if optimization_result:
                 optimized_points = optimization_result['points']
                 osrm_data = optimization_result.get('osrm_data')
@@ -2082,7 +2092,8 @@ def update_starting_point(route_id):
         longitude = float(data.get('longitude', 0))
         name = data.get('name', 'Ponto de Partida')
         optimize = data.get('optimize', False)
-        
+        return_to_start = data.get('return_to_start', False) # Get the new value
+
         if latitude == 0 or longitude == 0:
             return jsonify({'success': False, 'message': 'Coordenadas inválidas'}), 400
         
@@ -2131,11 +2142,11 @@ def update_starting_point(route_id):
             route.optimization_status = 'optimizing'
             db.session.commit()
             
-            # Executar otimização em segundo plano (chamar endpoint de otimização)
+            # Executar otimização em segundo plano
             try:
                 # Importar funções do appReta
                 from appReta import optimize_route as app_optimize_route
-                
+
                 # Obter todos os pontos da rota
                 route_points = RoutePoint.query.filter_by(route_id=route_id).all()
                 
@@ -2154,11 +2165,11 @@ def update_starting_point(route_id):
                             'cidade': point.city or ""
                         })
                     
-                    # Executar a otimização com o novo ponto de partida
+                    # Executar a otimização com o novo ponto de partida e return_to_start
                     partida_otimizacao = (latitude, longitude)
-                    optimization_result = app_optimize_route(points_for_optimization, partida_otimizacao)
+                    optimization_result = app_optimize_route(points_for_optimization, partida_otimizacao, return_to_start) # Pass return_to_start
                     optimized_points = optimization_result['points']
-                    osrm_data = optimization_result['osrm_data']
+                    osrm_data = optimization_result.get('osrm_data') # Use .get() for safety
                     
                     # Atualizar a ordem dos pontos baseado no resultado
                     for i, opt_point in enumerate(optimized_points, 1):
